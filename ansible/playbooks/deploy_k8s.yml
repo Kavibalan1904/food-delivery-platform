@@ -1,0 +1,20 @@
+---
+- name: Deploy SwiftBite Application to Kubernetes
+  hosts: all
+  tasks:
+    - name: Apply all Kubernetes manifests
+      command: kubectl apply -f k8s/
+
+    - name: Wait for backend to be ready
+      command: kubectl rollout status deployment/swiftbite-backend --timeout=60s
+
+    - name: Wait for frontend to be ready
+      command: kubectl rollout status deployment/swiftbite-frontend --timeout=60s
+
+    - name: Show running pods
+      command: kubectl get pods
+      register: pods_output
+
+    - name: Print pod status
+      debug:
+        var: pods_output.stdout_lines

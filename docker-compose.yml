@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # Database Service
+  mongodb:
+    image: mongo:latest
+    container_name: swiftbite-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  # Backend Microservice (FastAPI)
+  backend:
+    build: ./backend
+    container_name: swiftbite-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - DATABASE_NAME=swiftbite
+      - JWT_SECRET=swiftbite-secret-key-12345
+    depends_on:
+      - mongodb
+
+  # Frontend Microservice (React + Nginx)
+  frontend:
+    build: ./frontend
+    container_name: swiftbite-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:
