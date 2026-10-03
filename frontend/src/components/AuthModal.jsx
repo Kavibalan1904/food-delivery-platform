@@ -1,13 +1,30 @@
 import { useState } from 'react'
-import { FiX } from 'react-icons/fi'
+import { useNavigate } from 'react-router-dom'
+import { FiX, FiUser, FiLogIn } from 'react-icons/fi'
+import { MdRestaurant } from 'react-icons/md'
 import axios from 'axios'
 
 export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin, addToast }) {
   const [formData, setFormData] = useState({ name: '', email: '', password: '', phone: '' })
   const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleQuickFillDemo = () => {
+    setFormData({
+      name: 'Kavibalan',
+      email: 'kavi@swiggy.in',
+      password: 'password123',
+      phone: '+91 98401 23456'
+    })
+  }
+
+  const handleGoToPartner = () => {
+    onClose()
+    navigate('/partner')
   }
 
   const handleSubmit = async (e) => {
@@ -17,7 +34,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
     try {
       if (mode === 'signup') {
         const res = await axios.post('/api/auth/register', formData)
-        addToast('Account created successfully!')
+        addToast('Account created successfully! Please sign in.', 'success')
         onToggleMode()
       } else {
         const res = await axios.post('/api/auth/login', {
@@ -27,7 +44,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
         onLogin(res.data.user, res.data.token)
       }
     } catch (err) {
-      addToast(err.response?.data?.detail || 'Something went wrong', 'error')
+      addToast(err.response?.data?.detail || 'Invalid email or password', 'error')
     } finally {
       setLoading(false)
     }
@@ -45,14 +62,31 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
         </button>
 
         <h2 className="auth-modal-title">
-          {mode === 'login' ? 'Welcome back' : 'Create account'}
+          {mode === 'login' ? 'Customer Sign In' : 'Create Account'}
         </h2>
         <p className="auth-modal-subtitle">
           {mode === 'login'
-            ? 'Sign in to access your orders and favorites'
-            : 'Join SwiftBite for the best food delivery experience'
+            ? 'Sign in with your email to order and track food live'
+            : 'Join Swiggy Chennai for the best food delivery experience'
           }
         </p>
+
+        {/* Quick Demo Fill Button */}
+        <div style={{ marginBottom: '16px' }}>
+          <button
+            type="button"
+            onClick={handleQuickFillDemo}
+            style={{
+              width: '100%', padding: '8px 12px', borderRadius: '8px',
+              background: '#fff2e5', border: '1px dashed #fc8019',
+              color: '#fc8019', fontSize: '13px', fontWeight: 700,
+              cursor: 'pointer', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', gap: '6px'
+            }}
+          >
+            ⚡ Auto-Fill Demo Credentials (kavi@swiggy.in)
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit}>
           {mode === 'signup' && (
@@ -63,7 +97,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
                 id="auth-name"
                 name="name"
                 type="text"
-                placeholder="John Doe"
+                placeholder="Kavibalan"
                 value={formData.name}
                 onChange={handleChange}
                 required
@@ -78,7 +112,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
               id="auth-email"
               name="email"
               type="email"
-              placeholder="you@example.com"
+              placeholder="kavi@swiggy.in"
               value={formData.email}
               onChange={handleChange}
               required
@@ -107,7 +141,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
                 id="auth-phone"
                 name="phone"
                 type="tel"
-                placeholder="+91 98765 43210"
+                placeholder="+91 98401 23456"
                 value={formData.phone}
                 onChange={handleChange}
               />
@@ -120,7 +154,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
             disabled={loading}
             id="auth-submit-btn"
           >
-            {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
+            {loading ? 'Please wait...' : mode === 'login' ? 'Sign In as Customer' : 'Create Account'}
           </button>
         </form>
 
@@ -130,6 +164,25 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
             {mode === 'login' ? 'Sign up' : 'Sign in'}
           </span>
         </p>
+
+        {/* Switch to Restaurant Partner Portal */}
+        <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e2e7', textAlign: 'center' }}>
+          <p style={{ fontSize: '12px', color: '#7e808c', marginBottom: '8px' }}>
+            Are you a restaurant owner or kitchen manager?
+          </p>
+          <button
+            type="button"
+            onClick={handleGoToPartner}
+            style={{
+              padding: '8px 16px', borderRadius: '8px',
+              background: '#02060c', color: '#ffffff',
+              fontSize: '13px', fontWeight: 800, border: 'none',
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px'
+            }}
+          >
+            <MdRestaurant /> Open Restaurant Partner Portal ➔
+          </button>
+        </div>
       </div>
     </div>
   )

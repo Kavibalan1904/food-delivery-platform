@@ -107,21 +107,22 @@ async def create_order(
 @router.get("")
 async def list_orders(
     authorization: Optional[str] = Header(None),
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    restaurant_id: Optional[str] = None
 ):
-    """Get orders, optionally filtered by user."""
+    """Get orders, optionally filtered by user or restaurant."""
     db = get_db()
 
-    current_uid = user_id
-    if authorization and authorization.startswith("Bearer "):
+    query = {}
+    if restaurant_id:
+        query["restaurant_id"] = restaurant_id
+    elif user_id:
+        query["$or"] = [{"user_id": user_id}, {"user_id": None}]
+    elif authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         extracted = get_user_id_from_token(token)
         if extracted:
-            current_uid = extracted
-
-    query = {}
-    if current_uid:
-        query["$or"] = [{"user_id": current_uid}, {"user_id": None}]
+            query["$or"] = [{"user_id": extracted}, {"user_id": None}]
 
     orders = await db.orders.find(query).to_list(length=100)
 

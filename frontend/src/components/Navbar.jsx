@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMapPin, FiShoppingBag, FiX, FiChevronDown, FiCheck, FiHelpCircle, FiPercent } from 'react-icons/fi'
+import { MdRestaurant } from 'react-icons/md'
 
 const CHENNAI_NEIGHBORHOODS = [
   'T. Nagar, Chennai',
@@ -217,6 +218,20 @@ export default function Navbar({
               <FiShoppingBag size={18} />
             </div>
             <span>Orders</span>
+          </div>
+
+          {/* Restaurant Partner Hub Link */}
+          <div
+            className="swiggy-nav-item"
+            id="partner-nav-btn"
+            onClick={() => navigate('/partner')}
+            title="Restaurant Partner Kitchen Portal"
+            style={{ color: '#fc8019', fontWeight: 700 }}
+          >
+            <div className="swiggy-nav-icon-wrap">
+              <MdRestaurant size={18} />
+            </div>
+            <span>Partner Hub</span>
           </div>
 
           {/* User Sign In / Profile */}

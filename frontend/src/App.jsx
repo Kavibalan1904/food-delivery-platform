@@ -9,6 +9,7 @@ import OrdersPage from './pages/OrdersPage'
 import CartSidebar from './components/CartSidebar'
 import AuthModal from './components/AuthModal'
 import ToastContainer from './components/ToastContainer'
+import PartnerDashboard from './pages/PartnerDashboard'
 
 function App() {
   const [cart, setCart] = useState([])
@@ -139,6 +140,14 @@ function App() {
                 addToast={addToast}
               />
             }
+          />
+          <Route
+            path="/partner"
+            element={<PartnerDashboard addToast={addToast} />}
+          />
+          <Route
+            path="/restaurant-dashboard"
+            element={<PartnerDashboard addToast={addToast} />}
           />
         </Routes>
       </main>
