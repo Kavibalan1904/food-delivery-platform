@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMapPin, FiShoppingBag, FiX, FiChevronDown, FiCheck } from 'react-icons/fi'
-import { MdDeliveryDining } from 'react-icons/md'
+import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMapPin, FiShoppingBag, FiX, FiChevronDown, FiCheck, FiHelpCircle, FiPercent } from 'react-icons/fi'
 
 const CHENNAI_NEIGHBORHOODS = [
   'T. Nagar, Chennai',
@@ -28,13 +27,15 @@ export default function Navbar({
   const [scrolled, setScrolled] = useState(false)
   const [isLocationOpen, setIsLocationOpen] = useState(false)
   const [activeLocation, setActiveLocation] = useState(currentLocation)
+  const [isSearchActive, setIsSearchActive] = useState(false)
   const locationRef = useRef(null)
+  const searchInputRef = useRef(null)
 
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 10)
+    const handleScroll = () => setScrolled(window.scrollY > 5)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
@@ -63,6 +64,7 @@ export default function Navbar({
     if (onSearchChange) {
       onSearchChange('')
     }
+    setIsSearchActive(false)
   }
 
   const handleSelectLocation = (loc) => {
@@ -71,132 +73,202 @@ export default function Navbar({
     if (onLocationChange) onLocationChange(loc)
   }
 
-  return (
-    <nav className={`navbar ${scrolled ? 'scrolled' : ''}`} id="main-navbar">
-      <div className="navbar-inner">
-        <a className="navbar-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <div className="navbar-logo-icon">
-            <MdDeliveryDining />
-          </div>
-          Swift<span style={{ color: 'var(--brand-primary)' }}>Bite</span>
-        </a>
+  const handleSearchNavClick = () => {
+    if (location.pathname !== '/') {
+      navigate('/')
+    }
+    setIsSearchActive(true)
+    setTimeout(() => {
+      searchInputRef.current?.focus()
+    }, 100)
+  }
 
-        <div className="navbar-search">
-          <FiSearch className="navbar-search-icon" />
+  return (
+    <nav className={`swiggy-navbar ${scrolled ? 'scrolled' : ''}`} id="main-navbar">
+      <div className="swiggy-navbar-inner">
+        {/* Left Side: Swiggy Logo + Location Selector */}
+        <div className="swiggy-nav-left">
+          <a
+            className="swiggy-logo"
+            onClick={() => navigate('/')}
+            title="Swiggy"
+            style={{ cursor: 'pointer' }}
+          >
+            {/* Authentic Swiggy Orange Pin/S Vector Logo */}
+            <svg
+              className="swiggy-logo-svg"
+              viewBox="0 0 500 500"
+              width="44"
+              height="44"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect width="500" height="500" rx="120" fill="#FC8019" />
+              <path
+                d="M250 85C170 85 105 150 105 230C105 295 185 390 242 452C246.5 456.8 253.5 456.8 258 452C315 390 395 295 395 230C395 150 330 85 250 85ZM250 165C286 165 315 194 315 230C315 266 286 295 250 295C214 295 185 266 185 230C185 194 214 165 250 165Z"
+                fill="white"
+              />
+            </svg>
+            <span className="swiggy-wordmark">SWIGGY</span>
+          </a>
+
+          {/* Swiggy Location Selector */}
+          <div className="swiggy-location-wrapper" ref={locationRef}>
+            <button
+              className="swiggy-location-btn"
+              id="location-btn"
+              onClick={() => setIsLocationOpen(prev => !prev)}
+            >
+              <span className="swiggy-location-title">
+                {activeLocation.split(',')[0]}
+              </span>
+              <span className="swiggy-location-sub">
+                Chennai, Tamil Nadu, India
+              </span>
+              <FiChevronDown className={`swiggy-location-arrow ${isLocationOpen ? 'open' : ''}`} />
+            </button>
+
+            {isLocationOpen && (
+              <div className="swiggy-location-dropdown">
+                <div className="swiggy-location-dropdown-header">
+                  <FiMapPin style={{ color: '#FC8019' }} />
+                  <span>Choose Delivery Location in Chennai</span>
+                </div>
+                <div className="swiggy-location-list">
+                  {CHENNAI_NEIGHBORHOODS.map(loc => {
+                    const isSelected = activeLocation === loc
+                    return (
+                      <button
+                        key={loc}
+                        onClick={() => handleSelectLocation(loc)}
+                        className={`swiggy-location-item ${isSelected ? 'selected' : ''}`}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                          <span style={{ fontWeight: 700, color: isSelected ? '#FC8019' : '#02060c' }}>
+                            {loc.split(',')[0]}
+                          </span>
+                          <span style={{ fontSize: '12px', color: '#7e808c' }}>
+                            Chennai, Tamil Nadu
+                          </span>
+                        </div>
+                        {isSelected && <FiCheck style={{ color: '#FC8019' }} />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Center / Inline Search (Swiggy Style Instant Search) */}
+        <div className={`swiggy-search-box ${isSearchActive || searchQuery ? 'active' : ''}`}>
+          <FiSearch className="swiggy-search-icon" />
           <input
-            className="navbar-search-input"
+            ref={searchInputRef}
+            className="swiggy-search-input"
             type="text"
-            placeholder="Search Chennai restaurants, Thalappakatti, Filter Coffee..."
+            placeholder="Search for restaurants and food..."
             id="search-input"
             value={searchQuery}
             onChange={handleInputChange}
+            onFocus={() => setIsSearchActive(true)}
+            onBlur={() => {
+              if (!searchQuery) setIsSearchActive(false)
+            }}
           />
           {searchQuery && (
             <button
               onClick={handleClearSearch}
-              style={{
-                background: 'none', border: 'none', color: 'var(--text-tertiary)',
-                cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center'
-              }}
+              className="swiggy-search-clear"
               title="Clear search"
             >
-              <FiX size={16} />
+              <FiX size={15} />
             </button>
           )}
         </div>
 
-        <div className="navbar-actions">
-          {/* Chennai Location Picker */}
-          <div style={{ position: 'relative' }} ref={locationRef}>
-            <button
-              className="navbar-btn"
-              id="location-btn"
-              onClick={() => setIsLocationOpen(prev => !prev)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <FiMapPin className="navbar-btn-icon" style={{ color: 'var(--brand-primary)' }} />
-              <span>{activeLocation.split(',')[0]}</span>
-              <FiChevronDown size={14} style={{ opacity: 0.7 }} />
-            </button>
-
-            {isLocationOpen && (
-              <div style={{
-                position: 'absolute', top: 'calc(100% + 8px)', left: 0,
-                background: 'var(--bg-card)', borderRadius: '16px',
-                boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-medium)',
-                padding: '8px', minWidth: '220px', zIndex: 1000
-              }}>
-                <div style={{
-                  padding: '8px 12px 6px', fontSize: '0.75rem',
-                  fontWeight: 700, color: 'var(--text-tertiary)',
-                  textTransform: 'uppercase', letterSpacing: '0.5px'
-                }}>
-                  Deliver to in Chennai
-                </div>
-                {CHENNAI_NEIGHBORHOODS.map(loc => {
-                  const isSelected = activeLocation === loc
-                  return (
-                    <button
-                      key={loc}
-                      onClick={() => handleSelectLocation(loc)}
-                      style={{
-                        width: '100%', display: 'flex', alignItems: 'center',
-                        justifyContent: 'space-between', padding: '10px 12px',
-                        borderRadius: '10px', border: 'none',
-                        background: isSelected ? 'var(--brand-gradient-subtle)' : 'transparent',
-                        color: isSelected ? 'var(--brand-primary)' : 'var(--text-primary)',
-                        fontWeight: isSelected ? 700 : 500, fontSize: '0.85rem',
-                        cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <span>{loc}</span>
-                      {isSelected && <FiCheck size={14} />}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+        {/* Right Side: Swiggy Navigation Links */}
+        <div className="swiggy-nav-right">
+          {/* Swiggy Offers Link */}
+          <div
+            className="swiggy-nav-item"
+            onClick={() => {
+              navigate('/')
+              if (onSearchChange) onSearchChange('')
+            }}
+            title="Special Offers"
+          >
+            <div className="swiggy-nav-icon-wrap">
+              <FiPercent size={18} />
+            </div>
+            <span>Offers</span>
+            <span className="swiggy-badge-new">NEW</span>
           </div>
 
-          <button
-            className="navbar-btn"
+          {/* Orders / Live Tracking Link */}
+          <div
+            className="swiggy-nav-item"
             id="orders-nav-btn"
             onClick={() => navigate('/orders')}
-            title="View Orders and Live Tracking"
+            title="Your Orders"
           >
-            <FiShoppingBag className="navbar-btn-icon" />
+            <div className="swiggy-nav-icon-wrap">
+              <FiShoppingBag size={18} />
+            </div>
             <span>Orders</span>
-          </button>
+          </div>
 
+          {/* User Sign In / Profile */}
           {user ? (
-            <>
-              <button
-                className="navbar-btn"
+            <div className="swiggy-user-menu">
+              <div
+                className="swiggy-nav-item"
                 id="user-profile-btn"
                 onClick={() => navigate('/orders')}
                 title="Profile & Orders"
               >
-                <FiUser className="navbar-btn-icon" />
+                <div className="swiggy-nav-icon-wrap">
+                  <FiUser size={18} />
+                </div>
                 <span>{user.name.split(' ')[0]}</span>
+              </div>
+              <button
+                className="swiggy-logout-btn"
+                onClick={onLogout}
+                id="logout-btn"
+                title="Logout"
+              >
+                <FiLogOut size={16} />
               </button>
-              <button className="navbar-btn" onClick={onLogout} id="logout-btn" title="Logout">
-                <FiLogOut className="navbar-btn-icon" />
-              </button>
-            </>
+            </div>
           ) : (
-            <button className="navbar-btn" onClick={onAuthClick} id="login-btn">
-              <FiUser className="navbar-btn-icon" />
-              <span>Login</span>
-            </button>
+            <div
+              className="swiggy-nav-item"
+              onClick={onAuthClick}
+              id="login-btn"
+            >
+              <div className="swiggy-nav-icon-wrap">
+                <FiUser size={18} />
+              </div>
+              <span>Sign In</span>
+            </div>
           )}
 
-          <button className="navbar-cart" onClick={onCartClick} id="cart-btn">
-            <FiShoppingCart />
-            <span>Cart</span>
-            {cartCount > 0 && (
-              <span className="navbar-cart-badge">{cartCount}</span>
-            )}
-          </button>
+          {/* Swiggy Cart Button */}
+          <div
+            className="swiggy-nav-cart"
+            onClick={onCartClick}
+            id="cart-btn"
+          >
+            <div className="swiggy-cart-icon-wrap">
+              <FiShoppingCart size={19} />
+              {cartCount > 0 && (
+                <span className="swiggy-cart-badge">{cartCount}</span>
+              )}
+            </div>
+            <span className="swiggy-cart-label">Cart</span>
+          </div>
         </div>
       </div>
     </nav>

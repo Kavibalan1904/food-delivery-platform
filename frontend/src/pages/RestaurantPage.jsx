@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { FiStar, FiClock, FiMapPin, FiArrowLeft, FiSearch, FiX, FiPlus, FiMinus } from 'react-icons/fi'
+import {
+  FiStar, FiClock, FiMapPin, FiArrowLeft, FiSearch, FiX,
+  FiPlus, FiMinus, FiChevronDown, FiChevronUp, FiTag
+} from 'react-icons/fi'
+import { MdDeliveryDining } from 'react-icons/md'
 import axios from 'axios'
 
 export default function RestaurantPage({ addToCart, cart = [], onUpdateQuantity }) {
@@ -12,8 +16,9 @@ export default function RestaurantPage({ addToCart, cart = [], onUpdateQuantity 
 
   // Filtering states
   const [dietFilter, setDietFilter] = useState('all') // 'all', 'veg', 'non_veg'
-  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [bestsellerOnly, setBestsellerOnly] = useState(false)
   const [dishSearch, setDishSearch] = useState('')
+  const [collapsedCategories, setCollapsedCategories] = useState({})
 
   useEffect(() => {
     fetchRestaurant()
@@ -41,15 +46,6 @@ export default function RestaurantPage({ addToCart, cart = [], onUpdateQuantity 
     }
   }
 
-  // Calculate unique categories present in menu
-  const menuCategories = useMemo(() => {
-    const cats = new Set()
-    menuItems.forEach(item => {
-      if (item.category) cats.add(item.category)
-    })
-    return ['all', 'bestsellers', ...Array.from(cats)]
-  }, [menuItems])
-
   // Filtered menu items
   const filteredMenuItems = useMemo(() => {
     return menuItems.filter(item => {
@@ -57,11 +53,8 @@ export default function RestaurantPage({ addToCart, cart = [], onUpdateQuantity 
       if (dietFilter === 'veg' && !item.is_veg) return false
       if (dietFilter === 'non_veg' && item.is_veg) return false
 
-      // Category filter
-      if (categoryFilter === 'bestsellers' && !item.is_bestseller) return false
-      if (categoryFilter !== 'all' && categoryFilter !== 'bestsellers' && item.category !== categoryFilter) {
-        return false
-      }
+      // Bestseller filter
+      if (bestsellerOnly && !item.is_bestseller) return false
 
       // Dish search
       if (dishSearch.trim()) {
@@ -73,7 +66,25 @@ export default function RestaurantPage({ addToCart, cart = [], onUpdateQuantity 
 
       return true
     })
-  }, [menuItems, dietFilter, categoryFilter, dishSearch])
+  }, [menuItems, dietFilter, bestsellerOnly, dishSearch])
+
+  // Group items by category (Swiggy accordion structure)
+  const categorizedMenu = useMemo(() => {
+    const groups = {}
+    filteredMenuItems.forEach(item => {
+      const cat = item.category || 'recommended'
+      if (!groups[cat]) groups[cat] = []
+      groups[cat].push(item)
+    })
+    return groups
+  }, [filteredMenuItems])
+
+  const toggleCategoryCollapse = (cat) => {
+    setCollapsedCategories(prev => ({
+      ...prev,
+      [cat]: !prev[cat]
+    }))
+  }
 
   // Helper to get cart quantity for an item
   const getItemCartQty = (itemId) => {
@@ -83,351 +94,273 @@ export default function RestaurantPage({ addToCart, cart = [], onUpdateQuantity 
 
   if (!restaurant && !loading) {
     return (
-      <div className="container section" style={{ textAlign: 'center', padding: '80px 20px' }}>
-        <h2 style={{ fontSize: '1.8rem', marginBottom: '12px' }}>Restaurant not found</h2>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
-          The restaurant you are looking for might have closed or doesn't exist.
+      <div className="swiggy-container" style={{ textAlign: 'center', padding: '80px 20px' }}>
+        <h2 style={{ fontSize: '1.8rem', marginBottom: '12px', fontWeight: 800 }}>Restaurant not found</h2>
+        <p style={{ color: '#7e808c', marginBottom: '24px' }}>
+          The restaurant you are looking for might have closed or does not exist.
         </p>
-        <button className="btn btn-primary" onClick={() => navigate('/')}>
-          Go to Home
+        <button className="swiggy-orange-btn" onClick={() => navigate('/')}>
+          See all restaurants
         </button>
       </div>
     )
   }
 
   return (
-    <div id="restaurant-detail-page" style={{ paddingBottom: '80px' }}>
-      {/* Banner */}
-      <div className="restaurant-detail-banner">
-        {restaurant ? (
-          <img src={restaurant.image_url} alt={restaurant.name} />
-        ) : (
-          <div className="skeleton" style={{ height: '100%' }} />
-        )}
-        <div className="restaurant-detail-banner-overlay">
-          <button
-            onClick={() => navigate('/')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              color: 'white', fontSize: '14px', fontWeight: 600,
-              marginBottom: '12px', background: 'rgba(0, 0, 0, 0.4)',
-              padding: '8px 16px', borderRadius: '10px', backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)', cursor: 'pointer'
-            }}
-          >
-            <FiArrowLeft /> Back to restaurants
-          </button>
-        </div>
-      </div>
+    <div className="swiggy-restaurant-page" id="restaurant-detail-page">
+      <div className="swiggy-container">
+        {/* Breadcrumb Navigation */}
+        <nav className="swiggy-breadcrumb">
+          <span onClick={() => navigate('/')}>Home</span>
+          <span className="sep">/</span>
+          <span onClick={() => navigate('/')}>Chennai</span>
+          <span className="sep">/</span>
+          <span onClick={() => navigate('/')}>{restaurant?.address?.split(',')[0] || 'T. Nagar'}</span>
+          <span className="sep">/</span>
+          <span className="active">{restaurant?.name || 'Restaurant'}</span>
+        </nav>
 
-      {/* Info Card */}
-      <div className="container">
+        {/* Swiggy Restaurant Hero Card */}
         {restaurant ? (
-          <div className="restaurant-detail-info">
-            <div>
-              <h1 style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'var(--fs-2xl)',
-                fontWeight: 800,
-                marginBottom: '4px'
-              }}>
-                {restaurant.name}
-              </h1>
-              <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--fs-sm)' }}>
-                {restaurant.cuisines?.join(', ')}
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <FiMapPin size={14} /> {restaurant.address}
-              </p>
-              {restaurant.offer && (
-                <div style={{
-                  display: 'inline-block', marginTop: '10px',
-                  background: 'var(--brand-gradient-subtle)', color: 'var(--brand-primary)',
-                  padding: '4px 12px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700
-                }}>
-                  🏷️ {restaurant.offer}
+          <div className="swiggy-menu-header-card">
+            <div className="swiggy-menu-header-top">
+              <div>
+                <h1 className="swiggy-menu-restaurant-name">{restaurant.name}</h1>
+                <p className="swiggy-menu-cuisines">{restaurant.cuisines?.join(', ')}</p>
+                <p className="swiggy-menu-locality">
+                  <FiMapPin size={13} style={{ marginRight: '4px', color: '#fc8019' }} />
+                  {restaurant.address}
+                </p>
+              </div>
+
+              <div className="swiggy-menu-rating-box">
+                <div className="swiggy-menu-rating-badge">
+                  <FiStar /> {restaurant.rating}
                 </div>
-              )}
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div className="restaurant-card-rating" style={{ fontSize: 'var(--fs-base)', padding: '8px 14px' }}>
-                <FiStar /> {restaurant.rating}
+                <span className="swiggy-menu-rating-count">1K+ ratings</span>
+                <span className="swiggy-menu-price-two">₹{restaurant.price_for_two} for two</span>
               </div>
-              <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
-                <span style={{
-                  display: 'flex', alignItems: 'center', gap: '4px',
-                  fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)'
-                }}>
-                  <FiClock size={14} /> {restaurant.delivery_time} min
-                </span>
-                <span style={{
-                  display: 'flex', alignItems: 'center', gap: '4px',
-                  fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)'
-                }}>
-                  ₹{restaurant.price_for_two} for two
-                </span>
+            </div>
+
+            <hr className="swiggy-card-divider" />
+
+            <div className="swiggy-menu-delivery-meta">
+              <div className="swiggy-meta-item">
+                <FiClock className="swiggy-meta-icon" />
+                <span>{restaurant.delivery_time} MINS</span>
+              </div>
+              <div className="swiggy-meta-dot">•</div>
+              <div className="swiggy-meta-item">
+                <MdDeliveryDining className="swiggy-meta-icon" size={18} />
+                <span>{restaurant.distance} km</span>
+              </div>
+            </div>
+
+            {/* Swiggy Deals For You */}
+            <div className="swiggy-deals-row">
+              <div className="swiggy-deal-card">
+                <FiTag className="swiggy-deal-icon" />
+                <div className="swiggy-deal-info">
+                  <strong>{restaurant.offer || '60% OFF UPTO ₹120'}</strong>
+                  <span>USE CODE SWIGGY60 | ABOVE ₹199</span>
+                </div>
+              </div>
+              <div className="swiggy-deal-card">
+                <FiTag className="swiggy-deal-icon" />
+                <div className="swiggy-deal-info">
+                  <strong>FLAT ₹150 OFF</strong>
+                  <span>USE CODE FLAT150 | ON ₹499+</span>
+                </div>
+              </div>
+              <div className="swiggy-deal-card">
+                <FiTag className="swiggy-deal-icon" />
+                <div className="swiggy-deal-info">
+                  <strong>FREE DELIVERY</strong>
+                  <span>ON YOUR FIRST 3 ORDERS</span>
+                </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="restaurant-detail-info">
-            <div>
-              <div className="skeleton" style={{ height: 28, width: 200, marginBottom: 8 }} />
-              <div className="skeleton" style={{ height: 16, width: 300 }} />
-            </div>
+          <div className="swiggy-menu-header-card skeleton-box">
+            <div className="swiggy-skeleton-line" style={{ width: '40%', height: 28, marginBottom: 12 }} />
+            <div className="swiggy-skeleton-line" style={{ width: '25%', height: 16 }} />
           </div>
         )}
 
-        {/* Menu Controls Section */}
-        <div className="section" style={{ marginTop: '32px' }}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            flexWrap: 'wrap', gap: '16px', marginBottom: '24px'
-          }}>
-            <div>
-              <h2 className="section-title" style={{ marginBottom: '4px' }}>Recommended Dishes</h2>
-              <p className="section-subtitle" style={{ margin: 0 }}>
-                {filteredMenuItems.length} dishes available
-              </p>
-            </div>
+        {/* Menu Search and Filter Controls */}
+        <div className="swiggy-menu-controls-bar">
+          <div className="swiggy-menu-filters-left">
+            <button
+              className={`swiggy-toggle-btn veg ${dietFilter === 'veg' ? 'active' : ''}`}
+              onClick={() => setDietFilter(prev => prev === 'veg' ? 'all' : 'veg')}
+            >
+              <div className="swiggy-veg-icon" />
+              <span>Veg Only</span>
+            </button>
 
-            {/* Menu Search Bar */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              background: 'var(--bg-secondary)', border: '1px solid var(--border-medium)',
-              padding: '8px 14px', borderRadius: '12px', minWidth: '260px'
-            }}>
-              <FiSearch color="var(--text-tertiary)" />
-              <input
-                type="text"
-                placeholder="Search dishes in menu..."
-                value={dishSearch}
-                onChange={(e) => setDishSearch(e.target.value)}
-                style={{
-                  border: 'none', background: 'transparent', outline: 'none',
-                  color: 'var(--text-primary)', fontSize: '0.85rem', width: '100%'
-                }}
-              />
-              {dishSearch && (
-                <button
-                  onClick={() => setDishSearch('')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)' }}
-                >
-                  <FiX size={14} />
-                </button>
-              )}
-            </div>
+            <button
+              className={`swiggy-toggle-btn non-veg ${dietFilter === 'non_veg' ? 'active' : ''}`}
+              onClick={() => setDietFilter(prev => prev === 'non_veg' ? 'all' : 'non_veg')}
+            >
+              <div className="swiggy-nonveg-icon" />
+              <span>Non-Veg</span>
+            </button>
+
+            <button
+              className={`swiggy-toggle-btn ${bestsellerOnly ? 'active' : ''}`}
+              onClick={() => setBestsellerOnly(prev => !prev)}
+            >
+              <span>⭐ Bestseller</span>
+            </button>
           </div>
 
-          {/* Filter Pills (Diet & Categories) */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '24px' }}>
-            {/* Diet Filter Pills */}
-            <div style={{ display: 'flex', background: 'var(--neutral-100)', padding: '4px', borderRadius: '12px', gap: '4px' }}>
-              <button
-                onClick={() => setDietFilter('all')}
-                style={{
-                  padding: '6px 14px', borderRadius: '8px', border: 'none',
-                  background: dietFilter === 'all' ? 'var(--bg-card)' : 'transparent',
-                  fontWeight: dietFilter === 'all' ? 700 : 500, fontSize: '0.85rem',
-                  boxShadow: dietFilter === 'all' ? 'var(--shadow-xs)' : 'none',
-                  cursor: 'pointer', color: 'var(--text-primary)'
-                }}
-              >
-                All
+          {/* Dish Search in Menu */}
+          <div className="swiggy-menu-search">
+            <FiSearch className="swiggy-menu-search-icon" />
+            <input
+              type="text"
+              placeholder="Search in menu..."
+              value={dishSearch}
+              onChange={(e) => setDishSearch(e.target.value)}
+            />
+            {dishSearch && (
+              <button onClick={() => setDishSearch('')} className="swiggy-clear-icon">
+                <FiX size={14} />
               </button>
-              <button
-                onClick={() => setDietFilter('veg')}
-                style={{
-                  padding: '6px 14px', borderRadius: '8px', border: 'none',
-                  background: dietFilter === 'veg' ? '#10b981' : 'transparent',
-                  color: dietFilter === 'veg' ? 'white' : 'var(--text-primary)',
-                  fontWeight: dietFilter === 'veg' ? 700 : 500, fontSize: '0.85rem',
-                  cursor: 'pointer'
-                }}
-              >
-                Pure Veg 🌱
-              </button>
-              <button
-                onClick={() => setDietFilter('non_veg')}
-                style={{
-                  padding: '6px 14px', borderRadius: '8px', border: 'none',
-                  background: dietFilter === 'non_veg' ? '#ef4444' : 'transparent',
-                  color: dietFilter === 'non_veg' ? 'white' : 'var(--text-primary)',
-                  fontWeight: dietFilter === 'non_veg' ? 700 : 500, fontSize: '0.85rem',
-                  cursor: 'pointer'
-                }}
-              >
-                Non-Veg 🍗
-              </button>
-            </div>
-
-            <div style={{ height: '24px', width: '1px', background: 'var(--border-medium)', margin: '0 4px' }} />
-
-            {/* Category Pills */}
-            {menuCategories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setCategoryFilter(cat)}
-                style={{
-                  padding: '6px 16px', borderRadius: '20px',
-                  border: categoryFilter === cat ? '1px solid var(--brand-primary)' : '1px solid var(--border-medium)',
-                  background: categoryFilter === cat ? 'var(--brand-primary)' : 'var(--bg-card)',
-                  color: categoryFilter === cat ? 'white' : 'var(--text-secondary)',
-                  fontWeight: categoryFilter === cat ? 700 : 500, fontSize: '0.85rem',
-                  cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.2s ease',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {cat === 'bestsellers' ? '⭐ Bestsellers' : cat.replace(/_/g, ' ')}
-              </button>
-            ))}
+            )}
           </div>
+        </div>
 
-          {/* Dishes Count Indicator */}
-          {!loading && (
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              marginBottom: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600
-            }}>
-              <span>
-                Showing <strong style={{ color: 'var(--text-primary)' }}>{filteredMenuItems.length}</strong> {filteredMenuItems.length === 1 ? 'dish' : 'dishes'}
-              </span>
-              {(dietFilter !== 'all' || categoryFilter !== 'all' || dishSearch) && (
-                <button
-                  onClick={() => { setDietFilter('all'); setCategoryFilter('all'); setDishSearch('') }}
-                  style={{
-                    background: 'none', border: 'none', color: 'var(--brand-primary)',
-                    fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer'
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Menu Items Grid */}
+        {/* Dishes Sections / Accordions */}
+        <div className="swiggy-menu-sections">
           {loading ? (
-            <div className="menu-grid">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="food-card">
+            <div className="swiggy-menu-skeleton-list">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="swiggy-dish-row skeleton-row">
                   <div style={{ flex: 1 }}>
-                    <div className="skeleton" style={{ height: 16, width: 16, marginBottom: 8 }} />
-                    <div className="skeleton" style={{ height: 18, width: '60%', marginBottom: 8 }} />
-                    <div className="skeleton" style={{ height: 14, width: '30%', marginBottom: 8 }} />
-                    <div className="skeleton" style={{ height: 12, width: '80%' }} />
+                    <div className="swiggy-skeleton-line short" />
+                    <div className="swiggy-skeleton-line" />
+                    <div className="swiggy-skeleton-line half" />
                   </div>
-                  <div className="skeleton" style={{ width: 130, height: 100, borderRadius: 12, flexShrink: 0 }} />
+                  <div className="swiggy-skeleton-img" style={{ width: 140, height: 120, borderRadius: 16 }} />
                 </div>
               ))}
             </div>
-          ) : filteredMenuItems.length === 0 ? (
-            <div style={{
-              textAlign: 'center', padding: '60px 20px',
-              background: 'var(--bg-card)', borderRadius: '20px',
-              border: 'var(--border-light)'
-            }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🍲</div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '6px' }}>
-                No dishes matched your criteria
-              </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
-                Try switching between Pure Veg / Non-Veg or clearing search filters.
-              </p>
+          ) : Object.keys(categorizedMenu).length === 0 ? (
+            <div className="swiggy-empty-state" style={{ padding: '60px 20px' }}>
+              <div className="swiggy-empty-icon">🍲</div>
+              <h3>No dishes found</h3>
+              <p>No items matched your current filter criteria.</p>
               <button
-                onClick={() => { setDietFilter('all'); setCategoryFilter('all'); setDishSearch('') }}
-                style={{
-                  padding: '8px 20px', borderRadius: '10px',
-                  background: 'var(--brand-primary)', color: 'white',
-                  border: 'none', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer'
+                className="swiggy-orange-btn"
+                onClick={() => {
+                  setDietFilter('all')
+                  setBestsellerOnly(false)
+                  setDishSearch('')
                 }}
               >
                 Reset Menu Filters
               </button>
             </div>
           ) : (
-            <div className="menu-grid">
-              {filteredMenuItems.map(item => {
-                const qty = getItemCartQty(item._id)
-                return (
-                  <div key={item._id} className="food-card" id={`menu-item-${item._id}`}>
-                    <div className="food-card-info">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        <div className={`food-card-veg ${item.is_veg ? '' : 'non-veg'}`} title={item.is_veg ? 'Pure Veg' : 'Non-Veg'} />
-                        {item.is_bestseller && (
-                          <span style={{
-                            background: '#FFF3E0', color: '#E65100',
-                            fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px',
-                            borderRadius: '4px', textTransform: 'uppercase'
-                          }}>
-                            ★ Bestseller
-                          </span>
-                        )}
-                        <span style={{
-                          color: 'var(--text-tertiary)', fontSize: '0.75rem',
-                          textTransform: 'capitalize', marginLeft: 'auto'
-                        }}>
-                          {item.category?.replace(/_/g, ' ')}
-                        </span>
-                      </div>
-                      <h3 className="food-card-name">{item.name}</h3>
-                      <p className="food-card-price">₹{item.price}</p>
-                      <p className="food-card-desc">{item.description}</p>
-                    </div>
-                    <div className="food-card-image">
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        loading="lazy"
-                        onError={(e) => {
-                          e.target.onerror = null
-                          e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&h=350&fit=crop'
-                        }}
-                      />
-                      {qty > 0 && onUpdateQuantity ? (
-                        <div style={{
-                          position: 'absolute', bottom: '0px', left: '50%',
-                          transform: 'translateX(-50%)', display: 'flex',
-                          alignItems: 'center', gap: '6px', background: 'white',
-                          borderRadius: '8px', padding: '3px 8px',
-                          boxShadow: 'var(--shadow-md)', border: '1.5px solid var(--brand-primary)',
-                          zIndex: 2
-                        }}>
-                          <button
-                            onClick={() => onUpdateQuantity(item._id, -1)}
-                            style={{
-                              background: 'none', border: 'none', color: 'var(--brand-primary)',
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px'
-                            }}
-                          >
-                            <FiMinus size={12} />
-                          </button>
-                          <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--brand-primary)', minWidth: '16px', textAlign: 'center' }}>
-                            {qty}
-                          </span>
-                          <button
-                            onClick={() => onUpdateQuantity(item._id, 1)}
-                            style={{
-                              background: 'none', border: 'none', color: 'var(--brand-primary)',
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px'
-                            }}
-                          >
-                            <FiPlus size={12} />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          className="food-card-add-btn"
-                          onClick={() => addToCart({ ...item, restaurant_id: id })}
-                        >
-                          ADD
-                        </button>
-                      )}
-                    </div>
+            Object.entries(categorizedMenu).map(([category, items]) => {
+              const isCollapsed = collapsedCategories[category]
+              return (
+                <div key={category} className="swiggy-category-accordion">
+                  {/* Category Header */}
+                  <div
+                    className="swiggy-category-header"
+                    onClick={() => toggleCategoryCollapse(category)}
+                  >
+                    <h2 className="swiggy-category-title">
+                      {category.replace(/_/g, ' ')} ({items.length})
+                    </h2>
+                    {isCollapsed ? <FiChevronDown size={22} /> : <FiChevronUp size={22} />}
                   </div>
-                )
-              })}
-            </div>
+
+                  {/* Dishes inside this category */}
+                  {!isCollapsed && (
+                    <div className="swiggy-dishes-list">
+                      {items.map(dish => {
+                        const qty = getItemCartQty(dish._id)
+                        return (
+                          <div key={dish._id} className="swiggy-dish-row" id={`dish-${dish._id}`}>
+                            {/* Left details */}
+                            <div className="swiggy-dish-info">
+                              <div className="swiggy-dish-badge-row">
+                                <div
+                                  className={dish.is_veg ? 'swiggy-veg-icon' : 'swiggy-nonveg-icon'}
+                                  title={dish.is_veg ? 'Pure Veg' : 'Non-Veg'}
+                                />
+                                {dish.is_bestseller && (
+                                  <span className="swiggy-bestseller-tag">
+                                    ★ Bestseller
+                                  </span>
+                                )}
+                              </div>
+
+                              <h3 className="swiggy-dish-name">{dish.name}</h3>
+                              <p className="swiggy-dish-price">₹{dish.price}</p>
+
+                              <div className="swiggy-dish-rating">
+                                <span className="swiggy-star-text">★ 4.3</span>
+                                <span className="swiggy-rating-users">(42)</span>
+                              </div>
+
+                              <p className="swiggy-dish-desc">{dish.description}</p>
+                            </div>
+
+                            {/* Right Image + ADD Button */}
+                            <div className="swiggy-dish-media">
+                              <div className="swiggy-dish-img-wrap">
+                                <img
+                                  src={dish.image_url}
+                                  alt={dish.name}
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    e.target.onerror = null
+                                    e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&h=350&fit=crop'
+                                  }}
+                                />
+                                {/* Signature Swiggy Overlapping ADD button */}
+                                {qty === 0 ? (
+                                  <button
+                                    className="swiggy-add-btn"
+                                    onClick={() => addToCart({ ...dish, restaurant_id: restaurant._id })}
+                                    id={`add-btn-${dish._id}`}
+                                  >
+                                    <span>ADD</span>
+                                    <FiPlus size={14} className="swiggy-add-plus" />
+                                  </button>
+                                ) : (
+                                  <div className="swiggy-qty-counter">
+                                    <button
+                                      onClick={() => onUpdateQuantity(dish._id, -1)}
+                                      aria-label="Decrease quantity"
+                                    >
+                                      <FiMinus size={14} />
+                                    </button>
+                                    <span className="swiggy-qty-num">{qty}</span>
+                                    <button
+                                      onClick={() => onUpdateQuantity(dish._id, 1)}
+                                      aria-label="Increase quantity"
+                                    >
+                                      <FiPlus size={14} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              <span className="swiggy-customisable-text">customisable</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })
           )}
         </div>
       </div>
