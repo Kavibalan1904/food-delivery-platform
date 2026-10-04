@@ -17,23 +17,20 @@ pipeline {
             }
         }
 
-        // Stage 2: Automated testing and build verification
-        stage('2. Run Tests') {
-            steps {
-                echo 'Running Backend Integration Tests...'
-                sh 'cd backend && pip install -r requirements.txt && pytest'
-
-                echo 'Validating Frontend Production Build...'
-                sh 'cd frontend && npm install && npm run build'
-            }
-        }
-
-        // Stage 3: Build Docker container images
-        stage('3. Build Docker Images') {
+        // Stage 2: Build Docker container images (validates frontend build automatically)
+        stage('2. Build Docker Images') {
             steps {
                 echo 'Building Docker container images...'
                 sh "docker build -t ${BACKEND_IMAGE} ./backend"
                 sh "docker build -t ${FRONTEND_IMAGE} ./frontend"
+            }
+        }
+
+        // Stage 3: Automated testing inside clean container
+        stage('3. Run Tests') {
+            steps {
+                echo 'Running Backend Integration Tests inside Docker container...'
+                sh "docker run --rm ${BACKEND_IMAGE} pytest"
             }
         }
 
