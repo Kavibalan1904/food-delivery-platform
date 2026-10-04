@@ -3,7 +3,7 @@
   hosts: all
   tasks:
     - name: Apply all Kubernetes manifests
-      command: kubectl apply -f k8s/
+      command: kubectl apply -f "{{ playbook_dir }}/../../k8s/"
 
     - name: Wait for backend deployment to finish
       command: kubectl rollout status deployment/backend --timeout=60s
