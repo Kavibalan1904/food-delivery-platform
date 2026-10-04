@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        // Change this to your DockerHub username
-        DOCKER_HUB_USER = 'kavibalan1904'
+        // DockerHub username
+        DOCKER_HUB_USER = 'kavidevops03'
         BACKEND_IMAGE   = "${DOCKER_HUB_USER}/swiftbite-backend:latest"
         FRONTEND_IMAGE  = "${DOCKER_HUB_USER}/swiftbite-frontend:latest"
     }

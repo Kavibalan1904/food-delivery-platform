@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: kavibalan1904/swiftbite-backend:latest
+          image: kavidevops03/swiftbite-backend:latest
           ports:
             - containerPort: 8000
           env:
