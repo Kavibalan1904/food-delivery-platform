@@ -1,15 +1,15 @@
 ---
-- name: Deploy SwiftBite Application to Kubernetes
+- name: Deploy Swiggy-Style Application to Kubernetes
   hosts: all
   tasks:
     - name: Apply all Kubernetes manifests
       command: kubectl apply -f k8s/
 
-    - name: Wait for backend to be ready
-      command: kubectl rollout status deployment/swiftbite-backend --timeout=60s
+    - name: Wait for backend deployment to finish
+      command: kubectl rollout status deployment/backend --timeout=60s
 
-    - name: Wait for frontend to be ready
-      command: kubectl rollout status deployment/swiftbite-frontend --timeout=60s
+    - name: Wait for frontend deployment to finish
+      command: kubectl rollout status deployment/frontend --timeout=60s
 
     - name: Show running pods
       command: kubectl get pods

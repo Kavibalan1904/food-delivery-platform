@@ -1,455 +1,204 @@
-# SwiftBite: Containerized Microservices Deployment (Fresher Guide)
+# 🚀 Complete Fresher Deployment Guide on AWS EC2
+## Swiggy-Style Food Delivery Platform – Containerized Microservices Deployment
 
-This guide is designed specifically for your college / capstone / fresher interview presentation. Every file is kept clean, minimal, and 100% functional without unnecessary enterprise bloat.
-
----
-
-## 🗺️ The Big Picture: How All the Tools Connect
-
-Here is the exact story of your project from code to cloud:
-
-```
-[ Developer ]
-      │ (git push)
-      ▼
-[ GitHub Repository ]
-      │ (webhook / trigger)
-      ▼
-[ Jenkins CI Server ]
-      ├─ Stage 1: Checkout Code
-      ├─ Stage 2: Run Pytest Tests (Backend validation)
-      ├─ Stage 3: Build Docker Images (Backend & Frontend)
-      ├─ Stage 4: Push Images to DockerHub
-      ▼
-[ DockerHub Registry ] (kavibalan1904/swiftbite-backend & frontend)
-      │
-      ▼
-[ Ansible Automation ]
-      │ (runs kubectl apply -f k8s/)
-      ▼
-[ Kubernetes Cluster on AWS ]
-      ├─ MongoDB Pod + Service (Database)
-      ├─ Backend Pods (x2) + ClusterIP Service (FastAPI)
-      └─ Frontend Pods (x2) + LoadBalancer Service (React + Nginx)
-      │
-      ▼
-[ Prometheus & Grafana ]
-      ├─ Prometheus scrapes /metrics on Backend
-      └─ Grafana shows live graphs of requests & uptime
-```
+This guide gives you the exact step-by-step instructions to install and run **Docker, Jenkins, Kubernetes (Minikube), and Ansible all together on the SAME AWS EC2 server** (`c7i-flex.large`).
 
 ---
 
-## 1. Docker Files Explained Line-by-Line
-
-### A. Backend Dockerfile (`backend/Dockerfile`)
-```dockerfile
-# 1. Base image: We use official lightweight Python 3.11 slim
-FROM python:3.11-slim
-
-# 2. Set the working folder inside the container to /app
-WORKDIR /app
-
-# 3. Environment variables: Prevents Python writing .pyc files & flushes output immediately
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# 4. Copy requirements.txt first and install libraries
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 5. Copy the rest of the backend application code
-COPY . .
-
-# 6. Inform Docker that the app listens on port 8000
-EXPOSE 8000
-
-# 7. Start the FastAPI server when the container starts
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-> **Why copy `requirements.txt` first before `COPY . .`?**  
-> *Docker Layer Caching!* If you change only 1 line of Python code, Docker doesn't re-download all pip libraries. It re-uses the cached layer and builds in 2 seconds.
+## 📋 The Tools on This Single Server
+1. **Docker & Docker Compose** – Builds and runs microservice containers
+2. **Jenkins** – Runs automated CI/CD pipeline on port 8080
+3. **Minikube (Kubernetes)** – Single-node Kubernetes cluster running inside Docker
+4. **Kubectl** – CLI tool to manage Kubernetes pods & services
+5. **Ansible** – Deployment automation executing Kubernetes rollouts
+6. **AWS EC2 (`c7i-flex.large`)** – 2 vCPUs, 4GB RAM Ubuntu host machine
 
 ---
 
-### B. Frontend Dockerfile (`frontend/Dockerfile`)
-This uses a **2-Stage Multi-Stage Build**:
-- **Stage 1 (Node.js)**: Compiles React code into static HTML/JS/CSS files (`/app/dist`).
-- **Stage 2 (Nginx)**: Throws away the heavy Node.js engine and serves just the static files using lightweight Nginx (~25MB).
+## ☁️ Step 1: Launch the AWS EC2 Instance
 
-```dockerfile
-# Stage 1: Build the React application
-FROM node:18-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
+1. Log into your **AWS Console** and go to **EC2**.
+2. Click **Launch Instance**:
+   - **Name**: `food-delivery-platform`
+   - **OS**: Ubuntu 24.04 LTS (64-bit) (or Ubuntu 22.04 LTS)
+   - **Instance Type**: `c7i-flex.large` (2 vCPUs, 8GB RAM)
+   - **Key Pair**: Select your `.pem` key pair
+   - **Storage**: 40 GB gp3 (required for Docker image layers, Jenkins builds, and Minikube)
+3. **Security Group Inbound Rules** (open these ports):
+   - `22` (SSH) – Your IP
+   - `3000` (Frontend Web App) – Anywhere (`0.0.0.0/0`)
+   - `8000` (Backend API & Swagger Docs) – Anywhere
+   - `8080` (Jenkins Web Dashboard) – Anywhere
 
-# Stage 2: Serve the build files using Nginx
-FROM nginx:alpine
-# Copy compiled files from Stage 1 into Nginx web root
-COPY --from=build /app/dist /usr/share/nginx/html
-# Copy our custom Nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+---
+
+## 💻 Step 2: Install Docker, Jenkins & Kubernetes on the Server
+
+Connect to your EC2 instance via SSH:
+```bash
+ssh -i your-key.pem ubuntu@<YOUR-EC2-PUBLIC-IP>
+```
+
+### Option A: One-Command Automated Setup (Recommended)
+We created a complete script [`setup_server.sh`](file:///c:/Users/kavi1/OneDrive/Documents/food-delivery-platform/setup_server.sh) that installs everything, configures swap memory, starts Minikube, and sets up Jenkins permissions automatically:
+
+```bash
+git clone https://github.com/Kavibalan1904/food-delivery-platform.git
+cd food-delivery-platform
+chmod +x setup_server.sh
+./setup_server.sh
 ```
 
 ---
 
-### C. Frontend Nginx Config (`frontend/nginx.conf`)
-```nginx
-server {
-    listen 80;
-    server_name localhost;
+### Option B: Step-by-Step Manual Setup
 
-    # Where the React build files live
-    root /usr/share/nginx/html;
-    index index.html;
+If you want to run each command manually:
 
-    # Proxy: Forward any /api requests to the backend server
-    location /api/ {
-        proxy_pass http://backend:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+```bash
+# 1. Update packages & setup 2GB swap space (ensures smooth performance on 4GB RAM)
+sudo apt update && sudo apt upgrade -y
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
-    # SPA Fallback: If user refreshes on /order/123, send index.html so React Router handles it
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
+# 2. Install Docker & Docker Compose
+sudo apt install -y docker.io docker-compose-v2
+sudo usermod -aG docker ubuntu
+
+# 3. Install Java 17 & Jenkins
+sudo apt install -y openjdk-17-jre
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
+  /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install -y jenkins
+
+# CRITICAL: Allow Jenkins user to run Docker commands
+sudo usermod -aG docker jenkins
+sudo systemctl enable jenkins
+sudo systemctl restart jenkins
+
+# 4. Install Ansible & Kubectl
+sudo apt install -y ansible
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+rm -f kubectl
+
+# 5. Install & Start Minikube (Kubernetes on single-node)
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+rm -f minikube-linux-amd64
+
+# Start Minikube with Docker driver (allocated 2GB RAM, 2 CPUs)
+minikube start --driver=docker --memory=2048 --cpus=2
+
+# 6. Configure Jenkins Access to Kubernetes
+sudo mkdir -p /var/lib/jenkins/.kube /var/lib/jenkins/.minikube
+sudo cp -r ~/.kube/config /var/lib/jenkins/.kube/config
+sudo cp -r ~/.minikube/client.crt ~/.minikube/client.key ~/.minikube/ca.crt /var/lib/jenkins/.minikube/ 2>/dev/null || true
+sudo chown -R jenkins:jenkins /var/lib/jenkins/.kube /var/lib/jenkins/.minikube 2>/dev/null || true
+sudo chmod -R 755 ~/.minikube 2>/dev/null || true
+
+# 7. Apply docker group to current shell
+newgrp docker
 ```
 
 ---
 
-### D. Docker Compose (`docker-compose.yml`)
-Runs all 3 microservices on your laptop with a single command: `docker-compose up --build`.
+## 🏃 Step 3: Run the Application with Docker Compose
 
-```yaml
-version: '3.8'
+```bash
+cd food-delivery-platform
 
-services:
-  # Database Service
-  mongodb:
-    image: mongo:latest
-    container_name: swiftbite-mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
+# Start all services (Frontend, Backend, MongoDB)
+docker compose up -d --build
 
-  # Backend Microservice (FastAPI)
-  backend:
-    build: ./backend
-    container_name: swiftbite-backend
-    ports:
-      - "8000:8000"
-    environment:
-      - MONGODB_URL=mongodb://mongodb:27017
-      - DATABASE_NAME=swiftbite
-      - JWT_SECRET=swiftbite-secret-key-12345
-    depends_on:
-      - mongodb
-
-  # Frontend Microservice (React + Nginx)
-  frontend:
-    build: ./frontend
-    container_name: swiftbite-frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-
-volumes:
-  mongo-data:
+# Check running containers
+docker compose ps
 ```
+
+Open your browser and verify:
+- **Frontend App**: `http://<YOUR-EC2-IP>:3000`
+- **Backend API & Swagger**: `http://<YOUR-EC2-IP>:8000/docs`
+- **Health Check**: `http://<YOUR-EC2-IP>:8000/api/health`
 
 ---
 
-## 2. Jenkins CI/CD Pipeline Explained (`Jenkinsfile`)
+## ⚙️ Step 4: Configure Jenkins CI/CD Pipeline
 
-A simple, 5-stage declarative Jenkins pipeline:
-
-```groovy
-pipeline {
-    agent any
-
-    environment {
-        // Change to your DockerHub username
-        DOCKER_HUB_USER = 'kavibalan1904'
-        BACKEND_IMAGE   = "${DOCKER_HUB_USER}/swiftbite-backend:latest"
-        FRONTEND_IMAGE  = "${DOCKER_HUB_USER}/swiftbite-frontend:latest"
-    }
-
-    stages {
-        // Stage 1: Pull the latest code from GitHub
-        stage('1. Checkout Code') {
-            steps {
-                echo 'Pulling latest code from GitHub...'
-                checkout scm
-            }
-        }
-
-        // Stage 2: Run automated Pytest unit tests before building
-        stage('2. Run Tests') {
-            steps {
-                echo 'Running Backend Tests...'
-                sh 'cd backend && pip install -r requirements.txt && pytest'
-            }
-        }
-
-        // Stage 3: Build the container images
-        stage('3. Build Docker Images') {
-            steps {
-                echo 'Building Docker images for Backend and Frontend...'
-                sh "docker build -t ${BACKEND_IMAGE} ./backend"
-                sh "docker build -t ${FRONTEND_IMAGE} ./frontend"
-            }
-        }
-
-        // Stage 4: Log into DockerHub securely and push the images
-        stage('4. Push to DockerHub') {
-            steps {
-                echo 'Pushing Docker images to DockerHub...'
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                    sh "docker push ${BACKEND_IMAGE}"
-                    sh "docker push ${FRONTEND_IMAGE}"
-                }
-            }
-        }
-
-        // Stage 5: Trigger Ansible to deploy onto Kubernetes
-        stage('5. Deploy via Ansible') {
-            steps {
-                echo 'Deploying to Kubernetes using Ansible...'
-                sh 'ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy_k8s.yml'
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'Deployment successful! Application is running.'
-        }
-        failure {
-            echo 'Deployment failed! Check the console logs.'
-        }
-    }
-}
-```
+1. Open Jenkins in your browser: `http://<YOUR-EC2-IP>:8080`.
+2. Get the initial admin password from EC2:
+   ```bash
+   sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+   ```
+3. Install suggested plugins and create your admin account.
+4. **Add Docker Hub Credentials**:
+   - Go to **Manage Jenkins** ➔ **Credentials** ➔ **System** ➔ **Global credentials** ➔ **Add Credentials**.
+   - Kind: `Username with password`
+   - Scope: `Global`
+   - ID: `dockerhub-credentials` *(Must match the ID in your Jenkinsfile)*
+   - Username: Your Docker Hub username
+   - Password: Your Docker Hub password or Personal Access Token.
+5. **Create the Pipeline**:
+   - Click **New Item** ➔ Name: `swiftbite-pipeline` ➔ Select **Pipeline** ➔ Click **OK**.
+   - Under **Pipeline**, set Definition to **Pipeline script from SCM**.
+   - SCM: **Git**
+   - Repository URL: `https://github.com/Kavibalan1904/food-delivery-platform.git`
+   - Branch: `*/main` or `*/master`
+   - Script Path: `Jenkinsfile`
+   - Click **Save**.
+6. Click **Build Now** to run the 5-stage pipeline!
 
 ---
 
-## 3. Ansible Automation Explained
+## ☸️ Step 5: Kubernetes Deployment & Exposure
 
-### A. Inventory (`ansible/inventory/hosts.ini`)
-```ini
-[all]
-localhost ansible_connection=local
+Our Jenkins pipeline automatically deploys via Ansible:
+```bash
+ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy_k8s.yml
 ```
-Tells Ansible: "Run the commands directly on the local machine where `kubectl` is installed."
 
-### B. Deployment Playbook (`ansible/playbooks/deploy_k8s.yml`)
-```yaml
----
-- name: Deploy SwiftBite Application to Kubernetes
-  hosts: all
-  tasks:
-    # 1. Apply all Kubernetes manifests in the k8s folder
-    - name: Apply all Kubernetes manifests
-      command: kubectl apply -f k8s/
-
-    # 2. Wait until the backend pod is completely running
-    - name: Wait for backend to be ready
-      command: kubectl rollout status deployment/swiftbite-backend --timeout=60s
-
-    # 3. Wait until the frontend pod is completely running
-    - name: Wait for frontend to be ready
-      command: kubectl rollout status deployment/swiftbite-frontend --timeout=60s
-
-    # 4. Get the list of all running pods
-    - name: Show running pods
-      command: kubectl get pods
-      register: pods_output
-
-    # 5. Print the pod status in the console log
-    - name: Print pod status
-      debug:
-        var: pods_output.stdout_lines
+Verify the pods on Kubernetes:
+```bash
+kubectl get pods
+kubectl get services
 ```
+
+To expose the frontend from Minikube directly on your EC2 public IP:
+```bash
+kubectl port-forward --address 0.0.0.0 service/frontend 3000:80 &
+```
+Now opening `http://<YOUR-EC2-IP>:3000` loads the application served straight from your Kubernetes pods!
 
 ---
 
-## 4. Kubernetes Explained (`k8s/`)
+## 🎓 Step 6: Top 9 Viva / Interview Questions & Crisp Answers
 
-You have exactly 3 clean YAML files in `k8s/`:
+1. **Q: How can Docker, Jenkins, and Kubernetes all run on the same EC2 instance?**  
+   *A:* "We used Docker as the foundational container runtime. Jenkins runs as a native systemd service with access to the Docker daemon. Kubernetes runs via Minikube using the Docker driver (`--driver=docker`), meaning Kubernetes worker nodes run as lightweight containers on top of Docker."
 
-### A. Database: `k8s/mongodb.yaml`
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: swiftbite-mongodb
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mongodb
-  template:
-    metadata:
-      labels:
-        app: mongodb
-    spec:
-      containers:
-        - name: mongodb
-          image: mongo:latest
-          ports:
-            - containerPort: 27017
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mongodb
-spec:
-  ports:
-    - port: 27017
-      targetPort: 27017
-  selector:
-    app: mongodb
-```
+2. **Q: Why was `c7i-flex.large` chosen for this single-server setup?**  
+   *A:* "It provides 2 vCPUs and 4GB RAM powered by 4th Gen Intel Xeon Scalable processors. It provides high CPU clock speeds for fast Docker container compilation and npm builds, while offering up to 19% better price-performance than older instance families."
 
-### B. Backend: `k8s/backend.yaml`
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: swiftbite-backend
-spec:
-  replicas: 2 # Runs 2 instances for High Availability
-  selector:
-    matchLabels:
-      app: backend
-  template:
-    metadata:
-      labels:
-        app: backend
-    spec:
-      containers:
-        - name: backend
-          image: kavibalan1904/swiftbite-backend:latest
-          ports:
-            - containerPort: 8000
-          env:
-            - name: MONGODB_URL
-              value: "mongodb://mongodb:27017" # Connects to mongodb service!
-            - name: DATABASE_NAME
-              value: "swiftbite"
-            - name: JWT_SECRET
-              value: "swiftbite-secret-key-12345"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: backend
-spec:
-  ports:
-    - port: 8000
-      targetPort: 8000
-  selector:
-    app: backend
-```
+3. **Q: How does Jenkins execute Docker commands without permission errors?**  
+   *A:* "By adding the `jenkins` system user to the `docker` group (`sudo usermod -aG docker jenkins`) and restarting the Jenkins service. This gives Jenkins permissions to communicate with `/var/run/docker.sock`."
 
-### C. Frontend: `k8s/frontend.yaml`
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: swiftbite-frontend
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: frontend
-  template:
-    metadata:
-      labels:
-        app: frontend
-    spec:
-      containers:
-        - name: frontend
-          image: kavibalan1904/swiftbite-frontend:latest
-          ports:
-            - containerPort: 80
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: frontend
-spec:
-  type: LoadBalancer # On AWS, this automatically gives you a public URL!
-  ports:
-    - port: 80
-      targetPort: 80
-      nodePort: 30080  # Accessible on port 30080 if using NodePort
-  selector:
-    app: frontend
-```
+4. **Q: Why did you use a multi-stage Dockerfile for the frontend?**  
+   *A:* "Node.js is only needed to compile the React JSX code into static HTML/JS. In production, we don't need Node.js. Multi-stage building lets us build with Node in Stage 1 and copy only the compiled static files into a lightweight Nginx Alpine container in Stage 2, shrinking image size from ~800MB down to ~25MB."
 
----
+5. **Q: How does the Frontend talk to the Backend inside Kubernetes?**  
+   *A:* "In `frontend/nginx.conf`, we set up a reverse proxy forwarding all `/api/` calls to `http://backend:8000`. Inside Kubernetes, CoreDNS automatically resolves `backend` to the cluster IP of the backend service."
 
-## 5. Prometheus & Grafana Monitoring
+6. **Q: What is the difference between Docker Compose and Kubernetes?**  
+   *A:* "Docker Compose is a local tool used to run multi-container applications on a single host. Kubernetes is an enterprise orchestrator designed for production that manages clusters, multi-node scaling, self-healing, rolling updates, and high availability."
 
-### A. How Backend Exposes Metrics (`backend/main.py`)
-In `backend/main.py`, we added this simple endpoint:
-```python
-@app.get("/metrics", response_class=PlainTextResponse)
-async def get_metrics():
-    uptime = int(time.time() - START_TIME)
-    return (
-        f"app_uptime_seconds {uptime}\n"
-        f"http_requests_total {REQUEST_COUNT}\n"
-        f"app_status 1\n"
-    )
-```
-When you open `http://localhost:8000/metrics`, it returns:
-```
-app_uptime_seconds 360
-http_requests_total 42
-app_status 1
-```
+7. **Q: Why use Ansible when you already have Kubernetes and Jenkins?**  
+   *A:* "Jenkins handles CI (testing and building container images), while Ansible is a configuration management tool that automates the deployment steps. Ansible executes the `kubectl` commands cleanly, verifies pod rollout status, and can easily deploy to multiple environments (Dev, Staging, Prod)."
 
-### B. Prometheus Scrape Config (`monitoring/prometheus.yml`)
-```yaml
-global:
-  scrape_interval: 15s # Every 15 seconds, ask backend for metrics
+8. **Q: What is the difference between a Kubernetes Deployment and a Service?**  
+   *A:* "A **Deployment** creates and manages pods, ensuring the specified number of replicas are always running. A **Service** provides a stable IP address and DNS name with built-in load balancing so traffic can reach those pods even if pods restart and get new internal IPs."
 
-scrape_configs:
-  - job_name: 'swiftbite-backend'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['backend:8000']
-```
-Prometheus pulls this data every 15 seconds. In Grafana, you add Prometheus as a Data Source and create graphs showing total requests and uptime!
-
----
-
-## 6. Top 5 Viva / Interview Questions & Easy Answers
-
-1. **Q: What is a Docker multi-stage build and why did you use it in the frontend?**
-   - **Answer**: "In the frontend, we use Node.js to compile our React code into HTML and JS files. But in production, we don't need Node.js runtime. Multi-stage build allows us to build with Node in stage 1, and copy only the compiled static files into a lightweight Nginx container in stage 2. This reduces the image size from ~800MB to just ~25MB."
-
-2. **Q: What is the difference between a Kubernetes Deployment and a Service?**
-   - **Answer**: "A **Deployment** manages the Pods, handles self-healing, and runs the desired number of replicas. A **Service** provides a stable IP and DNS name with a built-in load balancer so other pods or external users can access those pods even if individual pods restart or get new IPs."
-
-3. **Q: How does the Frontend communicate with the Backend in Kubernetes?**
-   - **Answer**: "In Kubernetes, we created a Service named `backend` on port 8000. Kubernetes DNS automatically resolves `http://backend:8000`. Our Nginx frontend proxy forwards `/api/` calls directly to `http://backend:8000`."
-
-4. **Q: Why use Ansible when you already have Jenkins and Kubernetes?**
-   - **Answer**: "Jenkins is responsible for **Continuous Integration** (building images and running tests), while Ansible is used for **Configuration Management & Deployment Orchestration**. Ansible runs the deployment steps cleanly, verifies pod health, and can be reused to deploy to different environments (Dev, Staging, Prod)."
-
-5. **Q: How does your monitoring work?**
-   - **Answer**: "Our FastAPI backend exposes an internal `/metrics` endpoint. Prometheus scrapes this endpoint every 15 seconds using pull mechanism, and Grafana visualizes the traffic, request counts, and uptime."
+9. **Q: What happens if MongoDB is down?**  
+   *A:* "The FastAPI backend has an automatic in-memory collection fallback in `backend/app/database.py`. If MongoDB is unavailable, it automatically serves the pre-seeded restaurant and menu data in memory so the application never crashes."

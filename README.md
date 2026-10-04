@@ -1,102 +1,111 @@
-# 🍕 SwiftBite Chennai — Food Delivery Platform
+# 🍔 Swiggy-Style Food Delivery Platform – Containerized Microservices Deployment
 
-A full-stack, responsive Chennai-based food delivery platform built with **FastAPI (Python)** and **React + Vite**. Features vibrant modern design aesthetics, real-time live order tracking, category & dietary filters, interactive shopping cart, secure authentication with JWT, and MongoDB integration with seamless in-memory fallback. Featuring Chennai culinary legends including *Dindigul Thalappakatti*, *Murugan Idli Shop*, *Anjappar Chettinad*, *Tuscana Pizza*, and *Madras Coffee House*.
-
----
-
-## 🌟 Key Features
-
-### 🛒 Customer Experience
-- **Interactive Restaurant Discovery**: Filter dining spots by cuisine categories (*Biryani, Pizza, Burger, Chinese, South Indian, Desserts*) or sort by *Rating 4.0+*, *Fast Delivery*, and *Cost*.
-- **Real-Time Live Search**: Instant restaurant & dish filtering directly from the top navigation search bar or the hero section.
-- **Dietary & Menu Filtering**: Toggle *Pure Veg 🌱* vs *Non-Veg 🍗*, filter by *Bestsellers*, and search dishes within individual restaurant menus.
-- **Dynamic Shopping Cart**: Slide-out cart drawer with real-time quantity modifiers (`+` / `-`), total calculation, customizable delivery address, and instant order placement.
-- **Live Order Tracking**: Visual 5-stage order progress stepper (*Placed → Confirmed → Preparing → Out for Delivery → Delivered*) with an animated delivery route visualizer, driver contact card, and live simulation controls.
-- **Order History**: Access past orders with itemized breakdowns and one-click re-ordering.
-- **JWT Authentication**: Register and login with secure bcrypt password hashing and token persistence.
-
-### ⚙️ Backend Architecture
-- **FastAPI**: Async endpoints with automatic OpenAPI documentation.
-- **Database Layer**: Motor async MongoDB driver with an automatic, zero-configuration in-memory collection fallback for local development without MongoDB.
-- **Lifecycle Management**: Seed data automatically injected on startup for restaurants and menus.
-- **Robust Test Suite**: Comprehensive pytest integration tests verifying auth, restaurant search, menu retrieval, order lifecycle, and status updates.
+> **A Beginner-Friendly Fresher DevOps Project**  
+> **Tools Used:** GitHub • Jenkins • Docker • Kubernetes • Ansible • AWS EC2 (c7i-flex.large)  
+> **Microservices:** Frontend (React + Nginx) & Backend (FastAPI + Python)
 
 ---
 
-## 🏗️ Tech Stack
+## 📌 Project Overview
 
-| Layer | Technologies |
-|---|---|
-| **Frontend** | React 18, Vite, React Router DOM 6, React Icons, Axios, Vanilla CSS Design System |
-| **Backend** | Python 3.12, FastAPI, Uvicorn, Pydantic v2, Python-Jose (JWT), Passlib / Bcrypt |
-| **Database** | MongoDB (Motor Async Driver) with InMemoryCollection fallback |
-| **Testing** | Pytest, FastAPI TestClient, Browser Subagent Verification |
+This project is a **Swiggy-style food delivery platform** built as a clean, practical DevOps showcase. It is specifically designed to be **simple, clear, and easy to explain in college viva or entry-level DevOps interviews**.
+
+### The Flow in 1 Simple Picture:
+```
+[ Developer ]
+      │ (git push)
+      ▼
+[ GitHub Repository ]
+      │ (triggers pipeline)
+      ▼
+[ Jenkins Pipeline ]
+      ├─ 1. Git Checkout
+      ├─ 2. Run Tests (Pytest & Frontend Build)
+      ├─ 3. Build Docker Images (Frontend & Backend)
+      ├─ 4. Push to Docker Hub
+      └─ 5. Trigger Ansible Deployment
+      ▼
+[ Ansible Playbook ]
+      │ (runs kubectl apply -f k8s/)
+      ▼
+[ Kubernetes Cluster on EC2 ]
+      ├─ Backend Pods (FastAPI) + Service
+      └─ Frontend Pods (React) + LoadBalancer Service
+```
 
 ---
 
-## 🚀 Quick Start Guide
+## 📂 Project Structure (Simple & Clean)
 
-### 1. Prerequisites
-- Python 3.10+
-- Node.js 18+ & npm
+```
+food-delivery-platform/
+├── backend/
+│   ├── app/                    # FastAPI routes, models & database fallback
+│   ├── tests/                  # Pytest test cases
+│   ├── Dockerfile              # Backend container file (Python 3.11 slim)
+│   ├── main.py                 # FastAPI API entrypoint & health check
+│   └── requirements.txt        # Python libraries
+├── frontend/
+│   ├── src/                    # React UI components
+│   ├── Dockerfile              # Multi-stage Dockerfile (Node -> Nginx)
+│   ├── nginx.conf              # Nginx proxy forwarding /api to backend
+│   └── package.json            # React dependencies
+├── k8s/
+│   ├── backend.yaml            # Kubernetes Deployment & Service for Backend
+│   ├── frontend.yaml           # Kubernetes Deployment & Service for Frontend
+│   └── mongodb.yaml            # Database Service
+├── ansible/
+│   ├── inventory/hosts.ini     # Ansible target hosts
+│   └── playbooks/deploy_k8s.yml# Playbook to apply k8s manifests
+├── docker-compose.yml          # Local runner for Frontend, Backend & MongoDB
+├── Jenkinsfile                 # 5-Stage Declarative CI/CD pipeline
+├── setup_server.sh             # 1-Click EC2 bootstrap script (Docker, K8s, Jenkins)
+└── FRESHER_DEPLOYMENT_GUIDE.md # Step-by-step EC2 setup guide & viva Q&A
+```
 
-### 2. Backend Setup
+---
+
+## 🚀 Quick Run on AWS EC2 (or Laptop)
+
+### 1. Run Everything with Docker Compose
 ```bash
+docker compose up -d --build
+```
+
+### 2. Access the Application:
+| Service | URL | Description |
+|---|---|---|
+| **Frontend Web App** | `http://<EC2-IP>:3000` | Swiggy-style user interface |
+| **Backend REST API** | `http://<EC2-IP>:8000` | FastAPI server |
+| **API Docs (Swagger)**| `http://<EC2-IP>:8000/docs` | Interactive API documentation |
+| **Health Check** | `http://<EC2-IP>:8000/api/health` | Service health status |
+
+---
+
+## 🛠️ The 5 Core Tools Explained Simply
+
+1. **GitHub**: Stores source code and triggers Jenkins pipelines upon code commits.
+2. **Docker**: Packages the Frontend and Backend into lightweight container images.
+3. **Jenkins**: Automates the CI/CD pipeline (tests code, builds Docker images, pushes to Docker Hub, and triggers Ansible).
+4. **Ansible**: Runs automated playbooks to deploy our application to Kubernetes without manual typing.
+5. **Kubernetes**: Runs 2 replicas of each microservice for high availability and automatic self-healing.
+
+---
+
+## 🧪 Testing the Project
+
+```bash
+# Run backend pytest tests
 cd backend
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run backend test suite
 python -m pytest
 
-# Start backend server
-python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-```
-API Documentation will be live at: `http://127.0.0.1:8000/docs`
-
-### 3. Frontend Setup
-```bash
-cd frontend
-
-# Install npm dependencies (if not already installed)
-npm install
-
-# Start Vite dev server
-npm run dev
-```
-Web application will be accessible at: `http://localhost:3000/`
-
----
-
-## 📡 API Endpoints
-
-### Authentication
-- `POST /api/auth/register` — Register a new customer
-- `POST /api/auth/login` — Login and receive JWT access token
-- `GET /api/auth/me` — Retrieve logged-in user profile (Bearer token)
-
-### Restaurants & Menus
-- `GET /api/restaurants` — List restaurants (supports `cuisine`, `search`, `sort_by`)
-- `GET /api/restaurants/categories` — Get unique food categories
-- `GET /api/restaurants/{id}` — Get restaurant details
-- `GET /api/restaurants/{id}/menu` — Get restaurant menu items
-
-### Orders & Tracking
-- `POST /api/orders` — Place a new food order
-- `GET /api/orders` — List past orders (filtered by user if authenticated)
-- `GET /api/orders/{id}` — Get order status, delivery driver, and timeline
-- `PATCH /api/orders/{id}/status` — Update order status (simulation / driver updates)
-
----
-
-## 🧪 Running Tests
-```bash
-# Run backend pytest suite
-cd backend
-python -m pytest
-
-# Build frontend production bundle
+# Validate frontend production build
 cd ../frontend
 npm run build
 ```
+
+---
+
+## 🎓 2-Minute Interview Pitch
+> *"I built and deployed a Swiggy-style food delivery microservices platform on an AWS EC2 instance. The frontend is built with React and served via an Nginx multi-stage Docker container, and the backend is an asynchronous FastAPI service with an automated in-memory database fallback.  
+> I set up a complete CI/CD pipeline in Jenkins that runs automated unit tests, builds container images, pushes them to Docker Hub, and uses Ansible to deploy the manifests onto a Kubernetes cluster with automatic rolling updates and self-healing replicas."*

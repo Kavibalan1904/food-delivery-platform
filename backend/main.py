@@ -40,21 +40,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Prometheus metrics tracking (Pure Python, no extra dependencies)
-import time
-from fastapi.responses import PlainTextResponse
-
-START_TIME = time.time()
-REQUEST_COUNT = 0
-
-
-@app.middleware("http")
-async def count_requests(request, call_next):
-    global REQUEST_COUNT
-    REQUEST_COUNT += 1
-    return await call_next(request)
-
-
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(restaurants.router, prefix="/api/restaurants", tags=["Restaurants"])
@@ -65,21 +50,3 @@ app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "swiftbite-api", "version": "1.0.0"}
-
-
-@app.get("/metrics", response_class=PlainTextResponse)
-async def get_metrics():
-    """Prometheus metrics endpoint."""
-    uptime = int(time.time() - START_TIME)
-    return (
-        f"# HELP app_uptime_seconds Application uptime in seconds\n"
-        f"# TYPE app_uptime_seconds counter\n"
-        f"app_uptime_seconds {uptime}\n\n"
-        f"# HELP http_requests_total Total number of HTTP requests\n"
-        f"# TYPE http_requests_total counter\n"
-        f"http_requests_total {REQUEST_COUNT}\n\n"
-        f"# HELP app_status Application health status (1 = healthy)\n"
-        f"# TYPE app_status gauge\n"
-        f"app_status 1\n"
-    )
-

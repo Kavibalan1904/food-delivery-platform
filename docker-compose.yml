@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Database Service
+  # 1. Database Service (MongoDB)
   mongodb:
     image: mongo:latest
     container_name: swiftbite-mongodb
@@ -10,7 +10,7 @@ services:
     volumes:
       - mongo-data:/data/db
 
-  # Backend Microservice (FastAPI)
+  # 2. Backend Microservice (FastAPI + Python)
   backend:
     build: ./backend
     container_name: swiftbite-backend
@@ -23,7 +23,7 @@ services:
     depends_on:
       - mongodb
 
-  # Frontend Microservice (React + Nginx)
+  # 3. Frontend Microservice (React + Nginx)
   frontend:
     build: ./frontend
     container_name: swiftbite-frontend

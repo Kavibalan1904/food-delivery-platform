@@ -1,7 +1,12 @@
+# ==========================================
+# 1. MongoDB Database Deployment
+# ==========================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: swiftbite-mongodb
+  name: mongodb
+  labels:
+    app: mongodb
 spec:
   replicas: 1
   selector:
@@ -17,7 +22,11 @@ spec:
           image: mongo:latest
           ports:
             - containerPort: 27017
+
 ---
+# ==========================================
+# 2. MongoDB Service (ClusterIP Internal)
+# ==========================================
 apiVersion: v1
 kind: Service
 metadata:

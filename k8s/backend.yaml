@@ -1,7 +1,12 @@
+# ==========================================
+# 1. Backend Deployment (FastAPI Microservice)
+# ==========================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: swiftbite-backend
+  name: backend
+  labels:
+    app: backend
 spec:
   replicas: 2
   selector:
@@ -24,7 +29,11 @@ spec:
               value: "swiftbite"
             - name: JWT_SECRET
               value: "swiftbite-secret-key-12345"
+
 ---
+# ==========================================
+# 2. Backend Service (ClusterIP Internal)
+# ==========================================
 apiVersion: v1
 kind: Service
 metadata:

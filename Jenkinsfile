@@ -9,31 +9,38 @@ pipeline {
     }
 
     stages {
+        // Stage 1: Pull the latest code from GitHub
         stage('1. Checkout Code') {
             steps {
-                echo 'Pulling latest code from GitHub...'
+                echo 'Pulling latest code from GitHub repository...'
                 checkout scm
             }
         }
 
+        // Stage 2: Automated testing and build verification
         stage('2. Run Tests') {
             steps {
-                echo 'Running Backend Tests...'
+                echo 'Running Backend Integration Tests...'
                 sh 'cd backend && pip install -r requirements.txt && pytest'
+
+                echo 'Validating Frontend Production Build...'
+                sh 'cd frontend && npm install && npm run build'
             }
         }
 
+        // Stage 3: Build Docker container images
         stage('3. Build Docker Images') {
             steps {
-                echo 'Building Docker images for Backend and Frontend...'
+                echo 'Building Docker container images...'
                 sh "docker build -t ${BACKEND_IMAGE} ./backend"
                 sh "docker build -t ${FRONTEND_IMAGE} ./frontend"
             }
         }
 
+        // Stage 4: Authenticate and push images to DockerHub
         stage('4. Push to DockerHub') {
             steps {
-                echo 'Pushing Docker images to DockerHub...'
+                echo 'Pushing container images to DockerHub...'
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                     sh "docker push ${BACKEND_IMAGE}"
@@ -42,9 +49,10 @@ pipeline {
             }
         }
 
+        // Stage 5: Deploy to Kubernetes cluster using Ansible
         stage('5. Deploy via Ansible') {
             steps {
-                echo 'Deploying to Kubernetes using Ansible...'
+                echo 'Triggering Ansible deployment playbook onto Kubernetes...'
                 sh 'ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy_k8s.yml'
             }
         }
@@ -52,10 +60,10 @@ pipeline {
 
     post {
         success {
-            echo 'Deployment successful! Application is running.'
+            echo 'Pipeline completed successfully! Application is live.'
         }
         failure {
-            echo 'Deployment failed! Check the console logs.'
+            echo 'Pipeline failed! Review the console output for debugging.'
         }
     }
 }
