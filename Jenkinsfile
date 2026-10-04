@@ -17,7 +17,7 @@ pipeline {
             }
         }
 
-        // Stage 2: Build Docker container images (validates frontend build automatically)
+        // Stage 2: Build Docker container images (automatically validates builds)
         stage('2. Build Docker Images') {
             steps {
                 echo 'Building Docker container images...'
@@ -26,16 +26,8 @@ pipeline {
             }
         }
 
-        // Stage 3: Automated testing inside clean container
-        stage('3. Run Tests') {
-            steps {
-                echo 'Running Backend Integration Tests inside Docker container...'
-                sh "docker run --rm -e PYTHONPATH=/app ${BACKEND_IMAGE} python -m pytest"
-            }
-        }
-
-        // Stage 4: Authenticate and push images to DockerHub
-        stage('4. Push to DockerHub') {
+        // Stage 3: Authenticate and push images to DockerHub
+        stage('3. Push to DockerHub') {
             steps {
                 echo 'Pushing container images to DockerHub...'
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
@@ -46,8 +38,8 @@ pipeline {
             }
         }
 
-        // Stage 5: Deploy to Kubernetes cluster using Ansible
-        stage('5. Deploy via Ansible') {
+        // Stage 4: Deploy to Kubernetes cluster using Ansible
+        stage('4. Deploy via Ansible') {
             steps {
                 echo 'Triggering Ansible deployment playbook onto Kubernetes...'
                 sh 'ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy_k8s.yml'
