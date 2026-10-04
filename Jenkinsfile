@@ -30,7 +30,7 @@ pipeline {
         stage('3. Run Tests') {
             steps {
                 echo 'Running Backend Integration Tests inside Docker container...'
-                sh "docker run --rm ${BACKEND_IMAGE} pytest"
+                sh "docker run --rm -e PYTHONPATH=/app ${BACKEND_IMAGE} python -m pytest"
             }
         }
 

@@ -7,6 +7,7 @@ WORKDIR /app
 # 3. Environment settings: disable python byte-code & enable instant stdout/stderr flushing
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 # 4. Layer Caching: Install dependencies first before copying code
 COPY requirements.txt .
