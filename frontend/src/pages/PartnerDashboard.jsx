@@ -87,12 +87,23 @@ export default function PartnerDashboard({ addToast }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => navigate('/')}>
               <svg viewBox="0 0 500 500" width="36" height="36" fill="none">
-                <rect width="500" height="500" rx="120" fill="#FC8019" />
-                <path d="M250 85C170 85 105 150 105 230C105 295 185 390 242 452C246.5 456.8 253.5 456.8 258 452C315 390 395 295 395 230C395 150 330 85 250 85ZM250 165C286 165 315 194 315 230C315 266 286 295 250 295C214 295 185 266 185 230C185 194 214 165 250 165Z" fill="white" />
+                <defs>
+                  <linearGradient id="biteOrangePartner" x1="0" y1="0" x2="500" y2="500" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#FF9233" />
+                    <stop offset="100%" stopColor="#FC8019" />
+                  </linearGradient>
+                </defs>
+                <rect width="500" height="500" rx="125" fill="url(#biteOrangePartner)" />
+                <g transform="skewX(-10) translate(40, 0)">
+                  <polygon points="70,215 155,215 135,240 50,240" fill="white" />
+                  <polygon points="40,265 145,265 125,290 20,290" fill="white" />
+                  <polygon points="65,315 150,315 130,340 45,340" fill="white" opacity="0.9" />
+                  <path d="M160 120H285C345 120 380 152 380 205C380 238 358 264 320 276C365 288 392 318 392 362C392 418 345 448 285 448H160C146 448 135 437 135 423V145C135 131 146 120 160 120ZM205 180V244H276C298 244 316 232 316 212C316 192 298 180 276 180H205ZM205 316V388H282C308 388 326 374 326 352C326 330 308 316 282 316H205Z" fill="white" />
+                </g>
               </svg>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '18px', fontWeight: 900, color: '#fc8019', letterSpacing: '-0.3px', lineHeight: 1 }}>
-                  SWIGGY PARTNER
+                  BITE PARTNER
                 </span>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#7e808c', textTransform: 'uppercase' }}>
                   Merchant Kitchen Portal
@@ -246,7 +257,7 @@ export default function PartnerDashboard({ addToast }) {
             </h3>
             <p style={{ color: '#7e808c', fontSize: '14px', maxWidth: '420px', margin: '0 auto 20px' }}>
               {activeTab === 'active'
-                ? `When a customer orders from ${selectedRest.name} in the Swiggy customer app, it will appear here immediately!`
+                ? `When a customer orders from ${selectedRest.name} in the Bite customer app, it will appear here immediately!`
                 : 'No past orders have been completed yet.'}
             </p>
             {activeTab === 'active' && (

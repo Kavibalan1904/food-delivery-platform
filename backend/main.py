@@ -1,5 +1,5 @@
 """
-SwiftBite Food Delivery Platform - Backend API
+Bite Food Delivery Platform - Backend API
 FastAPI + MongoDB (Motor async driver)
 """
 
@@ -25,8 +25,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="SwiftBite API",
-    description="Food Delivery Platform Backend API",
+    title="Bite API",
+    description="Bite Food Delivery Platform Backend API",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -49,4 +49,4 @@ app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": "swiftbite-api", "version": "1.0.0"}
+    return {"status": "healthy", "service": "bite-api", "version": "1.0.0"}

@@ -92,10 +92,10 @@ export default function Navbar({
           <a
             className="swiggy-logo"
             onClick={() => navigate('/')}
-            title="Swiggy"
+            title="Bite"
             style={{ cursor: 'pointer' }}
           >
-            {/* Authentic Swiggy Orange Pin/S Vector Logo */}
+            {/* Bite Speed B Vector Logo */}
             <svg
               className="swiggy-logo-svg"
               viewBox="0 0 500 500"
@@ -104,13 +104,21 @@ export default function Navbar({
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
-              <rect width="500" height="500" rx="120" fill="#FC8019" />
-              <path
-                d="M250 85C170 85 105 150 105 230C105 295 185 390 242 452C246.5 456.8 253.5 456.8 258 452C315 390 395 295 395 230C395 150 330 85 250 85ZM250 165C286 165 315 194 315 230C315 266 286 295 250 295C214 295 185 266 185 230C185 194 214 165 250 165Z"
-                fill="white"
-              />
+              <defs>
+                <linearGradient id="biteOrangeNav" x1="0" y1="0" x2="500" y2="500" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#FF9233" />
+                  <stop offset="100%" stopColor="#FC8019" />
+                </linearGradient>
+              </defs>
+              <rect width="500" height="500" rx="125" fill="url(#biteOrangeNav)" />
+              <g transform="skewX(-10) translate(40, 0)">
+                <polygon points="70,215 155,215 135,240 50,240" fill="white" />
+                <polygon points="40,265 145,265 125,290 20,290" fill="white" />
+                <polygon points="65,315 150,315 130,340 45,340" fill="white" opacity="0.9" />
+                <path d="M160 120H285C345 120 380 152 380 205C380 238 358 264 320 276C365 288 392 318 392 362C392 418 345 448 285 448H160C146 448 135 437 135 423V145C135 131 146 120 160 120ZM205 180V244H276C298 244 316 232 316 212C316 192 298 180 276 180H205ZM205 316V388H282C308 388 326 374 326 352C326 330 308 316 282 316H205Z" fill="white" />
+              </g>
             </svg>
-            <span className="swiggy-wordmark">SWIGGY</span>
+            <span className="swiggy-wordmark">BITE</span>
           </a>
 
           {/* Swiggy Location Selector */}
