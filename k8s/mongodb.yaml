@@ -19,9 +19,28 @@ spec:
     spec:
       containers:
         - name: mongodb
-          image: mongo:latest
+          # Pin to mongo:7.0 to resolve SERVER-121912 (MongoDB 8.0 kernel 6.19+ incompatibility)
+          image: mongo:7.0
+          command: ["mongod"]
+          args: ["--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25"]
+          env:
+            - name: GLIBC_TUNABLES
+              value: "glibc.pthread.rseq=1"
           ports:
             - containerPort: 27017
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+      volumes:
+        - name: mongodb-data
+          emptyDir: {}
 
 ---
 # ==========================================

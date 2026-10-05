@@ -3,10 +3,12 @@ version: '3.8'
 services:
   # 1. Database Service (MongoDB)
   mongodb:
-    image: mongo:latest
+    image: mongo:7.0
     container_name: swiftbite-mongodb
     ports:
       - "27017:27017"
+    environment:
+      - GLIBC_TUNABLES=glibc.pthread.rseq=1
     volumes:
       - mongo-data:/data/db
 
