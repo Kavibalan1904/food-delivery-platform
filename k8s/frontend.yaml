@@ -20,6 +20,7 @@ spec:
       containers:
         - name: frontend
           image: kavidevops03/swiftbite-frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
 
