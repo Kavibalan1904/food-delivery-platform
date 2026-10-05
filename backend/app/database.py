@@ -96,7 +96,7 @@ class InMemoryCollection:
                     if doc_val != value:
                         return False
             else:
-                if doc_val != value:
+                if doc_val != value and str(doc_val) != str(value):
                     return False
         return True
 

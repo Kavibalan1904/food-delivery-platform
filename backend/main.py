@@ -31,10 +31,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for local frontend development
+# CORS middleware supporting localhost, cloud IPs, and deployment environments
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],
+    allow_origin_regex=r".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
