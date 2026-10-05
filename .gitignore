@@ -23,3 +23,6 @@ Thumbs.db
 ~$*
 *.tmp
 *.docx
+generate_docs.py
+docs_screenshots/
+txt
