@@ -162,7 +162,7 @@ export default function RestaurantPage({ addToCart, cart = [], onUpdateQuantity 
                 <FiTag className="swiggy-deal-icon" />
                 <div className="swiggy-deal-info">
                   <strong>{restaurant.offer || '60% OFF UPTO ₹120'}</strong>
-                  <span>USE CODE SWIGGY60 | ABOVE ₹199</span>
+                  <span>USE CODE BITE60 | ABOVE ₹199</span>
                 </div>
               </div>
               <div className="swiggy-deal-card">

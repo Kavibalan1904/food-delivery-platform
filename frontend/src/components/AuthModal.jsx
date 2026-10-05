@@ -16,7 +16,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
   const handleQuickFillDemo = () => {
     setFormData({
       name: 'Kavibalan',
-      email: 'kavi@swiggy.in',
+      email: 'kavi@bite.in',
       password: 'password123',
       phone: '+91 98401 23456'
     })
@@ -67,7 +67,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
         <p className="auth-modal-subtitle">
           {mode === 'login'
             ? 'Sign in with your email to order and track food live'
-            : 'Join Swiggy Chennai for the best food delivery experience'
+            : 'Join Bite Chennai for the best food delivery experience'
           }
         </p>
 
@@ -84,7 +84,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
               justifyContent: 'center', gap: '6px'
             }}
           >
-            ⚡ Auto-Fill Demo Credentials (kavi@swiggy.in)
+            ⚡ Auto-Fill Demo Credentials (kavi@bite.in)
           </button>
         </div>
 
@@ -112,7 +112,7 @@ export default function AuthModal({ isOpen, onClose, mode, onToggleMode, onLogin
               id="auth-email"
               name="email"
               type="email"
-              placeholder="kavi@swiggy.in"
+              placeholder="kavi@bite.in"
               value={formData.email}
               onChange={handleChange}
               required

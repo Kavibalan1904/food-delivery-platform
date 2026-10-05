@@ -83,12 +83,12 @@ export default function Footer() {
             <h4>Company</h4>
             <ul>
               <li><a href="#">About Us</a></li>
-              <li><a href="#">Swiggy Corporate</a></li>
+              <li><a href="#">Bite Corporate</a></li>
               <li><a href="#">Careers</a></li>
               <li><a href="#">Team</a></li>
-              <li><a href="#">Swiggy One</a></li>
-              <li><a href="#">Swiggy Instamart</a></li>
-              <li><a href="#">Swiggy Dineout</a></li>
+              <li><a href="#">Bite One</a></li>
+              <li><a href="#">Bite Mart</a></li>
+              <li><a href="#">Bite Dineout</a></li>
             </ul>
           </div>
 
@@ -122,12 +122,12 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Life at Swiggy */}
+          {/* Life at Bite */}
           <div className="swiggy-footer-col">
-            <h4>Life at Swiggy</h4>
+            <h4>Life at Bite</h4>
             <ul>
-              <li><a href="#">Explore With Swiggy</a></li>
-              <li><a href="#">Swiggy News</a></li>
+              <li><a href="#">Explore With Bite</a></li>
+              <li><a href="#">Bite News</a></li>
               <li><a href="#">SnackBar</a></li>
             </ul>
           </div>
