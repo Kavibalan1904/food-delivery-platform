@@ -24,13 +24,70 @@ export default function OrdersPage({ user, addToCart, addToast }) {
   const [loading, setLoading] = useState(true)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
-  // Fetch all orders or selected order
+  // Real-time synchronization: BroadcastChannel, window focus, storage events, and silent 2s polling
   useEffect(() => {
-    fetchOrders()
+    fetchOrders(true)
+
+    // 1. Instant cross-tab sync via BroadcastChannel (<1ms latency)
+    let channel
+    try {
+      channel = new BroadcastChannel('bite_order_updates')
+      channel.onmessage = (event) => {
+        const { orderId, status } = event.data || {}
+        if (orderId && status) {
+          applyStatusUpdate(orderId, status)
+        }
+      }
+    } catch {
+      // Fallback if BroadcastChannel unavailable
+    }
+
+    // 2. Storage event listener (sync across different windows/incognito)
+    const handleStorage = (e) => {
+      if (e.key === 'bite_last_order_update' && e.newValue) {
+        try {
+          const { orderId, status } = JSON.parse(e.newValue)
+          if (orderId && status) {
+            applyStatusUpdate(orderId, status)
+          }
+        } catch {}
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+
+    // 3. Auto-fetch when user focuses the tab
+    const handleFocus = () => fetchOrders(false)
+    window.addEventListener('focus', handleFocus)
+
+    // 4. Fast silent polling every 2 seconds for live status updates from server
+    const pollInterval = setInterval(() => {
+      fetchOrders(false)
+    }, 2000)
+
+    return () => {
+      clearInterval(pollInterval)
+      window.removeEventListener('storage', handleStorage)
+      window.removeEventListener('focus', handleFocus)
+      if (channel) channel.close()
+    }
   }, [paramOrderId, user])
 
-  const fetchOrders = async () => {
-    setLoading(true)
+  const applyStatusUpdate = (orderId, newStatus) => {
+    setSelectedOrder(prev => {
+      if (!prev) return prev
+      const isCurrent = prev._id === orderId || prev.order_id === orderId || String(prev._id || '') === String(orderId)
+      if (isCurrent && prev.status !== newStatus) {
+        const step = STATUS_STEPS.find(s => s.key === newStatus)
+        if (addToast) addToast(`Live Update: Order is now ${step?.label || newStatus}! 🔔`, 'info')
+        return { ...prev, status: newStatus }
+      }
+      return prev
+    })
+    setOrders(prev => prev.map(o => (o._id === orderId || o.order_id === orderId || String(o._id || '') === String(orderId)) ? { ...o, status: newStatus } : o))
+  }
+
+  const fetchOrders = async (showLoading = false) => {
+    if (showLoading) setLoading(true)
     try {
       const token = localStorage.getItem('token')
       const headers = token ? { Authorization: `Bearer ${token}` } : {}
@@ -38,26 +95,24 @@ export default function OrdersPage({ user, addToCart, addToast }) {
       const orderList = res.data || []
       setOrders(orderList)
 
-      if (paramOrderId) {
-        const found = orderList.find(o => o._id === paramOrderId || o.order_id === paramOrderId)
-        if (found) {
-          setSelectedOrder(found)
-        } else {
-          // Fetch direct order by id
-          try {
-            const single = await axios.get(`/api/orders/${paramOrderId}`)
-            setSelectedOrder(single.data)
-          } catch {
-            setSelectedOrder(orderList[0] || null)
+      setSelectedOrder(prev => {
+        const targetId = paramOrderId || prev?._id || prev?.order_id
+        if (targetId) {
+          const found = orderList.find(o => o._id === targetId || o.order_id === targetId || String(o._id || '') === String(targetId))
+          if (found) {
+            if (prev && prev.status !== found.status) {
+              const step = STATUS_STEPS.find(s => s.key === found.status)
+              if (addToast) addToast(`Live Update: Order is now ${step?.label || found.status}! 🔔`, 'info')
+            }
+            return found
           }
         }
-      } else if (orderList.length > 0) {
-        setSelectedOrder(orderList[0])
-      }
+        return prev || orderList[0] || null
+      })
     } catch (err) {
       console.error('Failed to fetch orders:', err)
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 

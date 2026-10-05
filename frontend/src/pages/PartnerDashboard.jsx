@@ -50,6 +50,17 @@ export default function PartnerDashboard({ addToast }) {
     }
   }
 
+  const broadcastStatusChange = (orderId, status) => {
+    try {
+      const bc = new BroadcastChannel('bite_order_updates')
+      bc.postMessage({ orderId, status })
+      bc.close()
+    } catch {}
+    try {
+      localStorage.setItem('bite_last_order_update', JSON.stringify({ orderId, status, timestamp: Date.now() }))
+    } catch {}
+  }
+
   const handleUpdateStatus = async (orderId, newStatus) => {
     setUpdatingOrderId(orderId)
     const rawId = typeof orderId === 'object' && orderId?.$oid ? orderId.$oid : orderId
@@ -63,6 +74,7 @@ export default function PartnerDashboard({ addToast }) {
       }
       // Update local state immediately
       setOrders(prev => prev.map(o => (o._id === orderId || o.order_id === orderId || o._id === safeId || o.order_id === safeId) ? { ...o, status: newStatus } : o))
+      broadcastStatusChange(safeId, newStatus)
     } catch (err) {
       console.warn('Status update via PATCH failed, attempting PUT fallback:', err)
       try {
@@ -71,10 +83,12 @@ export default function PartnerDashboard({ addToast }) {
           addToast(`Order #${displayTag} updated to ${newStatus.replace(/_/g, ' ')}!`, 'success')
         }
         setOrders(prev => prev.map(o => (o._id === orderId || o.order_id === orderId || o._id === safeId || o.order_id === safeId) ? { ...o, status: newStatus } : o))
+        broadcastStatusChange(safeId, newStatus)
       } catch (fallbackErr) {
         console.error('All remote status updates failed, applying optimistic update:', fallbackErr)
         // Optimistic fallback for partner testing so UI remains interactive
         setOrders(prev => prev.map(o => (o._id === orderId || o.order_id === orderId || o._id === safeId || o.order_id === safeId) ? { ...o, status: newStatus } : o))
+        broadcastStatusChange(safeId, newStatus)
         if (addToast) {
           addToast(`Order #${displayTag} updated to ${newStatus.replace(/_/g, ' ')}!`, 'success')
         }
