@@ -13,6 +13,7 @@ data:
     datasources:
       - name: Prometheus
         type: prometheus
+        uid: Prometheus
         access: proxy
         url: http://prometheus:9090
         isDefault: true
@@ -23,7 +24,658 @@ data:
 
 ---
 # ==========================================
-# 2. Grafana Deployment
+# 2. Grafana Dashboard Providers (ConfigMap)
+# ==========================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provider
+  labels:
+    app: grafana
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: "Bite Platform Dashboards"
+        orgId: 1
+        folder: "Bite Food Delivery"
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /etc/grafana/dashboards
+
+---
+# ==========================================
+# 3. Grafana Bite Platform Dashboard (ConfigMap)
+# ==========================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-bite
+  labels:
+    app: grafana
+data:
+  bite_platform_dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
+          "title": "Platform Overview & Key Performance Indicators (KPIs)",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [
+                { "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "HEALTHY" } }, "type": "value" }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 3, "x": 0, "y": 1 },
+          "id": 1,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "Backend Service Health",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "up{job=\"bite-backend\"}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 3, "x": 3, "y": 1 },
+          "id": 2,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "Total HTTP Requests",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(http_requests_total) or vector(0)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.2 },
+                  { "color": "red", "value": 0.5 }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 3, "x": 6, "y": 1 },
+          "id": 3,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "P95 Latency",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) or vector(0)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              },
+              "unit": "percent"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 3, "x": 9, "y": 1 },
+          "id": 4,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "5xx Server Error Rate",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "(sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) / (sum(rate(http_requests_total[5m])) + 0.0001)) * 100 or vector(0)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "orange", "value": null }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+          "id": 5,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "Total Orders Placed",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(bite_orders_total{status=\"placed\"}) or sum(bite_orders_total) or vector(0)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "purple", "value": null }
+                ]
+              },
+              "unit": "currencyINR"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+          "id": 6,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "Gross Order Revenue",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(bite_order_revenue_total) or vector(0)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "teal", "value": null }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+          "id": 7,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "Active In-Flight Orders",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "bite_active_orders or vector(0)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "id": 101,
+          "title": "HTTP Traffic & Latency Analysis",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 15,
+                "gradientMode": "opacity",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "id": 8,
+          "options": {
+            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "title": "HTTP Request Throughput by Endpoint",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(rate(http_requests_total[1m])) by (endpoint, method)",
+              "legendFormat": "{{method}} {{endpoint}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "showPoints": "never"
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "id": 9,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "title": "API Request Duration (Percentiles)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+              "legendFormat": "p50 (Median)",
+              "refId": "p50"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.90, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+              "legendFormat": "p90",
+              "refId": "p90"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+              "legendFormat": "p95",
+              "refId": "p95"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+              "legendFormat": "p99",
+              "refId": "p99"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "id": 102,
+          "title": "HTTP Status Codes & In-Flight Traffic",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "stacking": { "group": "A", "mode": "normal" }
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              { "matcher": { "id": "byRegexp", "options": ".*2[0-9]{2}.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+              { "matcher": { "id": "byRegexp", "options": ".*3[0-9]{2}.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+              { "matcher": { "id": "byRegexp", "options": ".*4[0-9]{2}.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+              { "matcher": { "id": "byRegexp", "options": ".*5[0-9]{2}.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+            ]
+          },
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 15 },
+          "id": 10,
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi" }
+          },
+          "title": "HTTP Status Code Distribution Over Time",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(rate(http_requests_total[1m])) by (status_code)",
+              "legendFormat": "HTTP {{status_code}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "lineInterpolation": "stepAfter",
+                "lineWidth": 2
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 15 },
+          "id": 11,
+          "options": {
+            "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi" }
+          },
+          "title": "Concurrent In-Flight Requests",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(http_requests_in_progress) by (endpoint)",
+              "legendFormat": "{{endpoint}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+          "id": 103,
+          "title": "Business Observability & Application Lifecycle",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 25,
+                "lineInterpolation": "smooth",
+                "lineWidth": 2
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 23 },
+          "id": 12,
+          "options": {
+            "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi" }
+          },
+          "title": "Order Processing Velocity by Status",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(rate(bite_orders_total[1m])) by (status)",
+              "legendFormat": "Status: {{status}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 60,
+                "lineWidth": 1
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 23 },
+          "id": 13,
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi" }
+          },
+          "title": "User Authentication Actions (Logins vs Registrations)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(rate(bite_user_actions_total[1m])) by (action)",
+              "legendFormat": "Action: {{action}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+          "id": 104,
+          "title": "Host & Microservice Resource Footprint",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 15,
+                "lineInterpolation": "smooth",
+                "lineWidth": 2
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 31 },
+          "id": 14,
+          "options": {
+            "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi" }
+          },
+          "title": "Backend Resident Memory (RSS)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "process_resident_memory_bytes{job=\"bite-backend\"}",
+              "legendFormat": "FastAPI Process RSS",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 15,
+                "lineInterpolation": "smooth",
+                "lineWidth": 2
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 31 },
+          "id": 15,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi" }
+          },
+          "title": "Backend CPU Usage",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "rate(process_cpu_seconds_total{job=\"bite-backend\"}[1m])",
+              "legendFormat": "FastAPI CPU Utilization",
+              "refId": "A"
+            }
+          ]
+        }
+      ],
+      "refresh": "5s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": ["bite", "fastapi", "food-delivery", "devops", "kubernetes"],
+      "time": {
+        "from": "now-15m",
+        "to": "now"
+      },
+      "timepicker": {
+        "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+      },
+      "timezone": "browser",
+      "title": "Bite Platform — Full-Stack Observability",
+      "uid": "bite-observability",
+      "version": 1
+    }
+---
+# ==========================================
+# 4. Grafana Deployment
 # ==========================================
 apiVersion: apps/v1
 kind: Deployment
@@ -63,18 +715,28 @@ spec:
           volumeMounts:
             - name: grafana-datasources-volume
               mountPath: /etc/grafana/provisioning/datasources
+            - name: grafana-dashboards-provider-volume
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: grafana-dashboard-bite-volume
+              mountPath: /etc/grafana/dashboards
             - name: grafana-storage-volume
               mountPath: /var/lib/grafana
       volumes:
         - name: grafana-datasources-volume
           configMap:
             name: grafana-datasources
+        - name: grafana-dashboards-provider-volume
+          configMap:
+            name: grafana-dashboards-provider
+        - name: grafana-dashboard-bite-volume
+          configMap:
+            name: grafana-dashboard-bite
         - name: grafana-storage-volume
           emptyDir: {}
 
 ---
 # ==========================================
-# 3. Grafana Service (NodePort)
+# 5. Grafana Service (NodePort)
 # ==========================================
 apiVersion: v1
 kind: Service
