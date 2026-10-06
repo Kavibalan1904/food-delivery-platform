@@ -199,18 +199,25 @@ Open your browser and verify:
    kubectl get services
    ```
    *(You will see 2 backend pods, 2 frontend pods, 1 mongodb pod, 1 prometheus pod, and 1 grafana pod all in `Running` status).*
-3. **Expose Services to the Public Internet:**
+3. **Expose All Services to the Public Internet (All-in-One):**
    ```bash
-   # Expose Customer Frontend (:3000)
+   # Kill any existing/stale port-forward processes first
+   pkill -f "kubectl port-forward"
+
+   # Expose all 4 Bite services simultaneously in background (&)
    kubectl port-forward --address 0.0.0.0 service/frontend 3000:80 &
-
-   # Expose Grafana Observability Dashboard (:3001)
+   kubectl port-forward --address 0.0.0.0 service/backend 8000:8000 &
    kubectl port-forward --address 0.0.0.0 service/grafana 3001:3000 &
-
-   # Expose Prometheus Metrics Server (:9090)
    kubectl port-forward --address 0.0.0.0 service/prometheus 9090:9090 &
    ```
-   *(Or connect directly through Minikube NodePorts: Frontend `30080`, Grafana `30030`, Prometheus `30090`).*
+
+   | Port | Service | Target | Purpose / URL |
+   | :--- | :--- | :--- | :--- |
+   | **3000** | `frontend` | `80` | Customer Web App & Partner Kitchen (`http://<EC2-IP>:3000`) |
+   | **8000** | `backend` | `8000` | FastAPI Swagger Docs & Endpoints (`http://<EC2-IP>:8000/docs`) |
+   | **3001** | `grafana` | `3000` | Full-Stack Observability Dashboard (`http://<EC2-IP>:3001`) |
+   | **9090** | `prometheus` | `9090` | Metrics Scraper & PromQL Console (`http://<EC2-IP>:9090`) |
+
 4. Visit `http://<YOUR-EC2-IP>:3000` for the live storefront and `http://<YOUR-EC2-IP>:3001` for real-time Grafana observability!
 
 ---
