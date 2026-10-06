@@ -329,7 +329,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "bite_active_orders or vector(0)",
+              "expr": "sum(bite_active_orders) or vector(0)",
               "refId": "A"
             }
           ]
