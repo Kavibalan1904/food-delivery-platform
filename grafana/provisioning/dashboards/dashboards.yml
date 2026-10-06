@@ -1,0 +1,15 @@
+# ==============================================================================
+# Grafana Dashboard Provider Configuration for Bite Food Delivery Platform
+# ==============================================================================
+apiVersion: 1
+
+providers:
+  - name: "Bite Platform Dashboards"
+    orgId: 1
+    folder: "Bite Food Delivery"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

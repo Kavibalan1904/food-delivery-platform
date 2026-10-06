@@ -15,18 +15,69 @@ const STATUS_STEPS = [
   { key: 'delivered', label: 'Delivered', desc: 'Enjoy your delicious meal!', icon: FiCheckCircle },
 ]
 
+// Local storage helpers
+const CACHE_KEY = 'bite_orders_cache'
+const getCachedOrders = () => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+const saveCachedOrders = (ordersList) => {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(ordersList))
+  } catch {}
+}
+
+// Robust ID matching supporting full UUIDs, MongoDB ObjectIds, and short hex IDs
+export const matchesOrderId = (orderOrId, queryId) => {
+  if (!orderOrId || !queryId) return false
+  const rawId1 = typeof orderOrId === 'string'
+    ? orderOrId
+    : (orderOrId._id || orderOrId.order_id || orderOrId.id || '')
+  const id1 = (typeof rawId1 === 'object' && rawId1?.$oid ? rawId1.$oid : String(rawId1)).toLowerCase().trim()
+  const id2 = String(queryId).toLowerCase().trim()
+  if (!id1 || !id2) return false
+  if (id1 === id2) return true
+  // Suffix matching for short IDs (e.g. last 6-8 chars like 'b61e2c99')
+  if (id2.length >= 6 && (id1.endsWith(id2) || id2.endsWith(id1))) return true
+  return false
+}
+
+const STATUS_KEYS = ['placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered']
+const shouldAdvanceStatus = (currentStatus, incomingStatus) => {
+  if (!currentStatus) return true
+  const cIdx = STATUS_KEYS.indexOf(currentStatus)
+  const iIdx = STATUS_KEYS.indexOf(incomingStatus)
+  if (cIdx === -1) return true
+  if (iIdx === -1) return false
+  // Never downgrade status due to stale poll or replica jitter
+  return iIdx >= cIdx
+}
+
 export default function OrdersPage({ user, addToCart, addToast }) {
   const { id: paramOrderId } = useParams()
   const navigate = useNavigate()
 
-  const [orders, setOrders] = useState([])
-  const [selectedOrder, setSelectedOrder] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // Initialize from cache so page renders instantly without blinking empty
+  const [orders, setOrders] = useState(() => getCachedOrders())
+  const [selectedOrder, setSelectedOrder] = useState(() => {
+    const cached = getCachedOrders()
+    if (paramOrderId) {
+      const match = cached.find(o => matchesOrderId(o, paramOrderId))
+      if (match) return match
+    }
+    return cached[0] || null
+  })
+  const [loading, setLoading] = useState(() => getCachedOrders().length === 0)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
-  // Real-time synchronization: BroadcastChannel, window focus, storage events, and silent 2s polling
+  // Real-time synchronization: BroadcastChannel, window focus, storage events, custom events, and silent polling
   useEffect(() => {
-    fetchOrders(true)
+    fetchOrders(orders.length === 0)
 
     // 1. Instant cross-tab sync via BroadcastChannel (<1ms latency)
     let channel
@@ -42,7 +93,7 @@ export default function OrdersPage({ user, addToCart, addToast }) {
       // Fallback if BroadcastChannel unavailable
     }
 
-    // 2. Storage event listener (sync across different windows/incognito)
+    // 2. Storage event listener (sync across different windows/profiles)
     const handleStorage = (e) => {
       if (e.key === 'bite_last_order_update' && e.newValue) {
         try {
@@ -55,11 +106,20 @@ export default function OrdersPage({ user, addToCart, addToast }) {
     }
     window.addEventListener('storage', handleStorage)
 
-    // 3. Auto-fetch when user focuses the tab
+    // 3. Custom event for same-window / in-app immediate dispatch
+    const handleCustomUpdate = (e) => {
+      const { orderId, status } = e.detail || {}
+      if (orderId && status) {
+        applyStatusUpdate(orderId, status)
+      }
+    }
+    window.addEventListener('bite_order_update', handleCustomUpdate)
+
+    // 4. Auto-fetch when user focuses the tab
     const handleFocus = () => fetchOrders(false)
     window.addEventListener('focus', handleFocus)
 
-    // 4. Fast silent polling every 2 seconds for live status updates from server
+    // 5. Silent polling every 2 seconds for live status updates from server
     const pollInterval = setInterval(() => {
       fetchOrders(false)
     }, 2000)
@@ -67,44 +127,113 @@ export default function OrdersPage({ user, addToCart, addToast }) {
     return () => {
       clearInterval(pollInterval)
       window.removeEventListener('storage', handleStorage)
+      window.removeEventListener('bite_order_update', handleCustomUpdate)
       window.removeEventListener('focus', handleFocus)
       if (channel) channel.close()
     }
   }, [paramOrderId, user])
 
   const applyStatusUpdate = (orderId, newStatus) => {
+    if (!orderId || !newStatus) return
+
     setSelectedOrder(prev => {
       if (!prev) return prev
-      const isCurrent = prev._id === orderId || prev.order_id === orderId || String(prev._id || '') === String(orderId)
-      if (isCurrent && prev.status !== newStatus) {
-        const step = STATUS_STEPS.find(s => s.key === newStatus)
-        if (addToast) addToast(`Live Update: Order is now ${step?.label || newStatus}! 🔔`, 'info')
-        return { ...prev, status: newStatus }
+      if (matchesOrderId(prev, orderId)) {
+        if (prev.status !== newStatus && shouldAdvanceStatus(prev.status, newStatus)) {
+          const step = STATUS_STEPS.find(s => s.key === newStatus)
+          if (addToast) addToast(`Live Update: Order is now ${step?.label || newStatus}! 🔔`, 'info')
+          return { ...prev, status: newStatus }
+        }
       }
       return prev
     })
-    setOrders(prev => prev.map(o => (o._id === orderId || o.order_id === orderId || String(o._id || '') === String(orderId)) ? { ...o, status: newStatus } : o))
+
+    setOrders(prev => {
+      const updated = prev.map(o => {
+        if (matchesOrderId(o, orderId)) {
+          return shouldAdvanceStatus(o.status, newStatus) ? { ...o, status: newStatus } : o
+        }
+        return o
+      })
+      saveCachedOrders(updated)
+      return updated
+    })
   }
 
   const fetchOrders = async (showLoading = false) => {
-    if (showLoading) setLoading(true)
+    if (showLoading && orders.length === 0) setLoading(true)
     try {
       const token = localStorage.getItem('token')
       const headers = token ? { Authorization: `Bearer ${token}` } : {}
-      const res = await axios.get('/api/orders', { headers })
-      const orderList = res.data || []
-      setOrders(orderList)
 
+      // 1. Fetch orders list
+      let orderList = []
+      try {
+        const res = await axios.get('/api/orders', { headers })
+        if (Array.isArray(res.data)) {
+          orderList = res.data
+        }
+      } catch (err) {
+        console.warn('Orders list fetch error:', err)
+      }
+
+      // 2. Direct fetch for tracked order ID if missing from list
+      if (paramOrderId) {
+        const hasTracked = orderList.some(o => matchesOrderId(o, paramOrderId))
+        if (!hasTracked) {
+          try {
+            const singleRes = await axios.get(`/api/orders/${paramOrderId}`)
+            if (singleRes.data && (singleRes.data._id || singleRes.data.order_id)) {
+              orderList = [singleRes.data, ...orderList]
+            }
+          } catch (e) {
+            console.warn(`Direct fetch for order #${paramOrderId} failed:`, e)
+          }
+        }
+      }
+
+      // 3. Merging strategy: Never wipe out existing cached orders on empty or partial response
+      setOrders(prev => {
+        const orderMap = new Map()
+        // Retain existing orders
+        prev.forEach(o => {
+          const k = String(o._id || o.order_id || '')
+          if (k) orderMap.set(k, o)
+        })
+        // Merge fresh server data
+        orderList.forEach(o => {
+          const k = String(o._id || o.order_id || '')
+          if (k) {
+            const existing = orderMap.get(k)
+            if (existing) {
+              const preservedStatus = shouldAdvanceStatus(existing.status, o.status) ? o.status : existing.status
+              orderMap.set(k, { ...existing, ...o, status: preservedStatus })
+            } else {
+              orderMap.set(k, o)
+            }
+          }
+        })
+        const merged = Array.from(orderMap.values())
+        // Sort newest first
+        merged.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+        saveCachedOrders(merged)
+        return merged
+      })
+
+      // 4. Update selected order cleanly without jumping or null resetting
       setSelectedOrder(prev => {
         const targetId = paramOrderId || prev?._id || prev?.order_id
         if (targetId) {
-          const found = orderList.find(o => o._id === targetId || o.order_id === targetId || String(o._id || '') === String(targetId))
+          const found = orderList.find(o => matchesOrderId(o, targetId)) || (prev && matchesOrderId(prev, targetId) ? prev : null)
           if (found) {
-            if (prev && prev.status !== found.status) {
-              const step = STATUS_STEPS.find(s => s.key === found.status)
-              if (addToast) addToast(`Live Update: Order is now ${step?.label || found.status}! 🔔`, 'info')
+            const resolvedStatus = (prev && matchesOrderId(prev, targetId) && !shouldAdvanceStatus(prev.status, found.status))
+              ? prev.status
+              : found.status
+            if (prev && prev.status !== resolvedStatus) {
+              const step = STATUS_STEPS.find(s => s.key === resolvedStatus)
+              if (addToast) addToast(`Live Update: Order is now ${step?.label || resolvedStatus}! 🔔`, 'info')
             }
-            return found
+            return { ...found, status: resolvedStatus }
           }
         }
         return prev || orderList[0] || null
@@ -216,11 +345,11 @@ export default function OrdersPage({ user, addToCart, addToast }) {
           </button>
         </div>
 
-        {loading && orders.length === 0 ? (
+        {loading && orders.length === 0 && !selectedOrder ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <div className="skeleton" style={{ height: '300px', maxWidth: '800px', margin: '0 auto', borderRadius: '24px' }} />
           </div>
-        ) : orders.length === 0 ? (
+        ) : orders.length === 0 && !selectedOrder ? (
           <div style={{
             textAlign: 'center', padding: '60px 20px',
             background: 'var(--bg-card)', borderRadius: '24px',

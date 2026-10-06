@@ -11,6 +11,7 @@ import bcrypt
 from jose import jwt, JWTError
 
 from app.database import get_db
+from app.metrics import USER_ACTIONS_TOTAL
 
 router = APIRouter()
 
@@ -45,9 +46,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+DEFAULT_JWT_SECRET = "swiftbite-secret-key-12345"
+
+
 def create_token(user_id: str) -> str:
     """Create JWT token."""
-    secret = os.getenv("JWT_SECRET", "secret-key-change-in-production")
+    secret = os.getenv("JWT_SECRET", DEFAULT_JWT_SECRET)
     algorithm = os.getenv("JWT_ALGORITHM", "HS256")
     hours = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
     payload = {
@@ -83,6 +87,11 @@ async def register(data: RegisterRequest):
     user_id = str(result.inserted_id)
     token = create_token(user_id)
 
+    try:
+        USER_ACTIONS_TOTAL.labels(action="register").inc()
+    except Exception:
+        pass
+
     return {
         "message": "User registered successfully",
         "user_id": user_id,
@@ -110,6 +119,11 @@ async def login(data: LoginRequest):
 
     token = create_token(str(user["_id"]))
 
+    try:
+        USER_ACTIONS_TOTAL.labels(action="login").inc()
+    except Exception:
+        pass
+
     return {
         "token": token,
         "user": {
@@ -123,7 +137,7 @@ async def login(data: LoginRequest):
 
 def get_user_id_from_token(token: str) -> Optional[str]:
     """Extract user_id from JWT token safely."""
-    secret = os.getenv("JWT_SECRET", "swiftbite-super-secret-key-change-in-production")
+    secret = os.getenv("JWT_SECRET", DEFAULT_JWT_SECRET)
     algorithm = os.getenv("JWT_ALGORITHM", "HS256")
     try:
         payload = jwt.decode(token, secret, algorithms=[algorithm])

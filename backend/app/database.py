@@ -137,19 +137,25 @@ async def connect_db():
     mongo_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
     db_name = os.getenv("DATABASE_NAME", "swiftbite")
 
-    try:
-        from motor.motor_asyncio import AsyncIOMotorClient
-        client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=3000)
-        # Test connection
-        await client.admin.command("ping")
-        db_client = client
-        db = client[db_name]
-        USE_MONGO = True
-        print(f"[OK] Connected to MongoDB: {db_name}")
-    except Exception as e:
-        print(f"[WARN] MongoDB not available ({e}). Using in-memory database.")
-        USE_MONGO = False
-        db = InMemoryDB()
+    # Retry connection up to 4 times in case MongoDB container is still initializing
+    for attempt in range(1, 5):
+        try:
+            from motor.motor_asyncio import AsyncIOMotorClient
+            client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=2000)
+            await client.admin.command("ping")
+            db_client = client
+            db = client[db_name]
+            USE_MONGO = True
+            print(f"[OK] Connected to MongoDB: {db_name} (attempt {attempt})")
+            return
+        except Exception as e:
+            if attempt < 4:
+                import asyncio
+                await asyncio.sleep(1.5)
+            else:
+                print(f"[WARN] MongoDB not available ({e}). Using in-memory database.")
+                USE_MONGO = False
+                db = InMemoryDB()
 
 
 async def close_db():

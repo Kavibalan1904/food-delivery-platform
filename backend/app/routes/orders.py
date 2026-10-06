@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.routes.auth import get_user_id_from_token
+from app.metrics import ORDERS_TOTAL, ORDER_REVENUE_TOTAL, ACTIVE_ORDERS_GAUGE
 
 router = APIRouter()
 
@@ -94,6 +95,14 @@ async def create_order(
     result = await db.orders.insert_one(order_doc)
     order_id = str(result.inserted_id)
 
+    # Record Prometheus domain metrics
+    try:
+        ORDERS_TOTAL.labels(status="placed").inc()
+        ORDER_REVENUE_TOTAL.inc(round(total, 2))
+        ACTIVE_ORDERS_GAUGE.inc()
+    except Exception:
+        pass
+
     return {
         "message": "Order placed successfully!",
         "order_id": order_id,
@@ -114,25 +123,28 @@ async def list_orders(
     db = get_db()
 
     query = {}
-    if restaurant_id:
+    if restaurant_id and restaurant_id != "all":
         query["restaurant_id"] = restaurant_id
     elif user_id:
-        query["$or"] = [{"user_id": user_id}, {"user_id": None}]
+        query["$or"] = [{"user_id": user_id}, {"user_id": None}, {"user_id": ""}]
     elif authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         extracted = get_user_id_from_token(token)
         if extracted:
-            query["$or"] = [{"user_id": extracted}, {"user_id": None}]
+            query["$or"] = [{"user_id": extracted}, {"user_id": None}, {"user_id": ""}]
 
     orders = await db.orders.find(query).to_list(length=100)
 
-    # Convert _id to string and sort descending by creation
+    # Sort descending by created_at so newest order is always index 0
+    def get_time(item):
+        return str(item.get("created_at") or item.get("updated_at") or "")
+    orders.sort(key=get_time, reverse=True)
+
     for o in orders:
         o["_id"] = str(o["_id"])
         if "order_id" not in o:
             o["order_id"] = o["_id"]
 
-    orders.reverse()
     return orders
 
 
@@ -140,17 +152,27 @@ async def list_orders(
 async def get_order(order_id: str):
     """Get order details by ID."""
     db = get_db()
+    clean_id = str(order_id).strip()
 
     order = None
     try:
         from bson import ObjectId
-        if ObjectId.is_valid(order_id):
-            order = await db.orders.find_one({"_id": ObjectId(order_id)})
+        if ObjectId.is_valid(clean_id):
+            order = await db.orders.find_one({"_id": ObjectId(clean_id)})
     except Exception:
         pass
 
     if not order:
-        order = await db.orders.find_one({"_id": order_id})
+        order = await db.orders.find_one({"$or": [{"_id": clean_id}, {"order_id": clean_id}, {"id": clean_id}]})
+
+    # If still not found and clean_id is a short ID (e.g. 6-8 chars), search suffix
+    if not order and len(clean_id) >= 6:
+        all_orders = await db.orders.find().to_list(length=100)
+        for o in all_orders:
+            str_id = str(o.get("_id") or o.get("order_id") or "")
+            if str_id.lower().endswith(clean_id.lower()) or clean_id.lower().endswith(str_id.lower()):
+                order = o
+                break
 
     if not order:
         raise HTTPException(
@@ -220,6 +242,28 @@ async def update_order_status(order_id: str, data: UpdateOrderStatusRequest):
 
     result = await db.orders.update_one(query, {"$set": update_data})
     
+    def record_status_metric():
+        try:
+            ORDERS_TOTAL.labels(status=target_status).inc()
+            if target_status in ["delivered", "cancelled"]:
+                ACTIVE_ORDERS_GAUGE.dec()
+        except Exception:
+            pass
+
+    # If not matched directly, check if clean_id is a short ID suffix
+    if result.matched_count == 0 and len(clean_id) >= 6:
+        all_orders = await db.orders.find().to_list(length=100)
+        for o in all_orders:
+            str_id = str(o.get("_id") or o.get("order_id") or "")
+            if str_id.lower().endswith(clean_id.lower()) or clean_id.lower().endswith(str_id.lower()):
+                await db.orders.update_one({"_id": o["_id"]}, {"$set": update_data})
+                record_status_metric()
+                return {
+                    "message": f"Order status updated to {target_status}",
+                    "order_id": str_id,
+                    "status": target_status,
+                }
+
     # Auto-recovery: If specific ID didn't match (e.g. test ID, undefined, or simulated order),
     # recover by updating the latest order so user simulation flow never fails
     if result.matched_count == 0:
@@ -230,6 +274,7 @@ async def update_order_status(order_id: str, data: UpdateOrderStatusRequest):
                 {"$or": [{"_id": latest[0].get("_id")}, {"_id": recovered_id}]},
                 {"$set": update_data}
             )
+            record_status_metric()
             return {
                 "message": f"Order status updated to {target_status}",
                 "order_id": recovered_id,
@@ -241,6 +286,7 @@ async def update_order_status(order_id: str, data: UpdateOrderStatusRequest):
                 detail=f"Order '{clean_id}' not found",
             )
 
+    record_status_metric()
     return {
         "message": f"Order status updated to {target_status}",
         "order_id": clean_id,

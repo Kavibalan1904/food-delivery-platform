@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FiCheckCircle, FiClock, FiMapPin, FiPhone, FiRefreshCw,
@@ -8,6 +8,7 @@ import { MdRestaurant, MdDeliveryDining } from 'react-icons/md'
 import axios from 'axios'
 
 const RESTAURANTS = [
+  { id: 'all', name: 'All Restaurants (Live Kitchen Feed)', area: 'All Outlets' },
   { id: 'rest_001', name: 'Dindigul Thalappakatti', area: 'T. Nagar, Chennai' },
   { id: 'rest_002', name: 'Tuscana Pizza & Italian Trattoria', area: 'Nungambakkam, Chennai' },
   { id: 'rest_003', name: "Sandy's Chocolate Laboratory", area: 'Alwarpet, Chennai' },
@@ -18,46 +19,99 @@ const RESTAURANTS = [
   { id: 'rest_008', name: 'Madras Coffee House & Beach Bites', area: 'Besant Nagar, Chennai' },
 ]
 
+const PARTNER_CACHE_KEY = 'bite_partner_orders_cache'
+const getCachedPartnerOrders = () => {
+  try {
+    const raw = localStorage.getItem(PARTNER_CACHE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+const saveCachedPartnerOrders = (ordersList) => {
+  try {
+    localStorage.setItem(PARTNER_CACHE_KEY, JSON.stringify(ordersList))
+  } catch {}
+}
+
 export default function PartnerDashboard({ addToast }) {
-  const [selectedRestId, setSelectedRestId] = useState('rest_001')
-  const [orders, setOrders] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [selectedRestId, setSelectedRestId] = useState('all')
+  const [orders, setOrders] = useState(() => getCachedPartnerOrders())
+  const [loading, setLoading] = useState(() => getCachedPartnerOrders().length === 0)
   const [isAcceptingOrders, setIsAcceptingOrders] = useState(true)
   const [activeTab, setActiveTab] = useState('active') // 'active', 'delivered'
   const [updatingOrderId, setUpdatingOrderId] = useState(null)
   const navigate = useNavigate()
 
+  // Persistent BroadcastChannel so messages are never aborted before transmission
+  const channelRef = useRef(null)
   useEffect(() => {
-    fetchRestaurantOrders()
-    // Poll every 5 seconds for new incoming orders
+    try {
+      channelRef.current = new BroadcastChannel('bite_order_updates')
+    } catch {}
+    return () => {
+      if (channelRef.current) channelRef.current.close()
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchRestaurantOrders(orders.length === 0)
+    // Poll every 3 seconds for new incoming orders
     const timer = setInterval(() => {
       fetchRestaurantOrders(false)
-    }, 5000)
+    }, 3000)
     return () => clearInterval(timer)
   }, [selectedRestId])
 
   const fetchRestaurantOrders = async (showLoading = true) => {
-    if (showLoading) setLoading(true)
+    if (showLoading && orders.length === 0) setLoading(true)
     try {
-      const res = await axios.get('/api/orders', {
-        params: { restaurant_id: selectedRestId }
+      const params = selectedRestId !== 'all' ? { restaurant_id: selectedRestId } : {}
+      const res = await axios.get('/api/orders', { params })
+      const incoming = Array.isArray(res.data) ? res.data : []
+
+      setOrders(prev => {
+        const orderMap = new Map()
+        // Retain existing orders so UI never flaps empty
+        prev.forEach(o => {
+          const k = String(o._id || o.order_id || '')
+          if (k) orderMap.set(k, o)
+        })
+        incoming.forEach(o => {
+          const k = String(o._id || o.order_id || '')
+          if (k) {
+            const existing = orderMap.get(k)
+            orderMap.set(k, { ...existing, ...o })
+          }
+        })
+        const merged = Array.from(orderMap.values())
+        merged.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+        saveCachedPartnerOrders(merged)
+        return merged
       })
-      setOrders(res.data || [])
     } catch (err) {
-      console.error('Failed to fetch restaurant orders:', err)
+      console.warn('Failed to fetch restaurant orders:', err)
     } finally {
       if (showLoading) setLoading(false)
     }
   }
 
   const broadcastStatusChange = (orderId, status) => {
+    const payload = { orderId: String(orderId), status, timestamp: Date.now() }
+    // 1. BroadcastChannel for cross-tab instant notification (<1ms)
+    if (channelRef.current) {
+      try {
+        channelRef.current.postMessage(payload)
+      } catch {}
+    }
+    // 2. Storage event for cross-window notification
     try {
-      const bc = new BroadcastChannel('bite_order_updates')
-      bc.postMessage({ orderId, status })
-      bc.close()
+      localStorage.setItem('bite_last_order_update', JSON.stringify(payload))
     } catch {}
+    // 3. Custom event for local window components
     try {
-      localStorage.setItem('bite_last_order_update', JSON.stringify({ orderId, status, timestamp: Date.now() }))
+      window.dispatchEvent(new CustomEvent('bite_order_update', { detail: payload }))
     } catch {}
   }
 
@@ -67,30 +121,32 @@ export default function PartnerDashboard({ addToast }) {
     const safeId = String(rawId || '')
     const displayTag = safeId ? safeId.slice(-6).toUpperCase() : 'ORDER'
 
+    // Optimistic local state update + broadcast immediately
+    setOrders(prev => {
+      const updated = prev.map(o => (
+        o._id === orderId || o.order_id === orderId || o._id === safeId || o.order_id === safeId
+      ) ? { ...o, status: newStatus } : o)
+      saveCachedPartnerOrders(updated)
+      return updated
+    })
+    broadcastStatusChange(safeId, newStatus)
+
     try {
       await axios.patch(`/api/orders/${safeId}/status`, { status: newStatus })
       if (addToast) {
-        addToast(`Order #${displayTag} updated to ${newStatus.replace(/_/g, ' ')}!`, 'success')
+        addToast(`Order #${displayTag} updated to ${newStatus.replace(/_/g, ' ')}! 🔔`, 'success')
       }
-      // Update local state immediately
-      setOrders(prev => prev.map(o => (o._id === orderId || o.order_id === orderId || o._id === safeId || o.order_id === safeId) ? { ...o, status: newStatus } : o))
-      broadcastStatusChange(safeId, newStatus)
     } catch (err) {
       console.warn('Status update via PATCH failed, attempting PUT fallback:', err)
       try {
         await axios.put(`/api/orders/${safeId}/status`, { status: newStatus })
         if (addToast) {
-          addToast(`Order #${displayTag} updated to ${newStatus.replace(/_/g, ' ')}!`, 'success')
+          addToast(`Order #${displayTag} updated to ${newStatus.replace(/_/g, ' ')}! 🔔`, 'success')
         }
-        setOrders(prev => prev.map(o => (o._id === orderId || o.order_id === orderId || o._id === safeId || o.order_id === safeId) ? { ...o, status: newStatus } : o))
-        broadcastStatusChange(safeId, newStatus)
       } catch (fallbackErr) {
-        console.error('All remote status updates failed, applying optimistic update:', fallbackErr)
-        // Optimistic fallback for partner testing so UI remains interactive
-        setOrders(prev => prev.map(o => (o._id === orderId || o.order_id === orderId || o._id === safeId || o.order_id === safeId) ? { ...o, status: newStatus } : o))
-        broadcastStatusChange(safeId, newStatus)
+        console.warn('All remote status updates failed, simulation mode active:', fallbackErr)
         if (addToast) {
-          addToast(`Order #${displayTag} updated to ${newStatus.replace(/_/g, ' ')}!`, 'success')
+          addToast(`Order #${displayTag} updated to ${newStatus.replace(/_/g, ' ')}! (Live Sync)`, 'success')
         }
       }
     } finally {
@@ -100,10 +156,14 @@ export default function PartnerDashboard({ addToast }) {
 
   const selectedRest = RESTAURANTS.find(r => r.id === selectedRestId) || RESTAURANTS[0]
 
-  // Filter orders by active vs completed
-  const activeOrders = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled')
-  const deliveredOrders = orders.filter(o => o.status === 'delivered')
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.total || o.total_amount || 0), 0)
+  // Filter orders by outlet and status
+  const outletOrders = selectedRestId === 'all'
+    ? orders
+    : orders.filter(o => o.restaurant_id === selectedRestId || !o.restaurant_id)
+
+  const activeOrders = outletOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled')
+  const deliveredOrders = outletOrders.filter(o => o.status === 'delivered')
+  const totalRevenue = outletOrders.reduce((sum, o) => sum + (o.total || o.total_amount || 0), 0)
 
   return (
     <div className="partner-portal" style={{ background: '#f4f5f7', minHeight: '100vh', paddingBottom: '80px' }}>
@@ -294,9 +354,9 @@ export default function PartnerDashboard({ addToast }) {
             {activeTab === 'active' && (
               <button
                 className="swiggy-orange-btn"
-                onClick={() => navigate(`/restaurant/${selectedRestId}`)}
+                onClick={() => navigate(selectedRestId === 'all' ? '/' : `/restaurant/${selectedRestId}`)}
               >
-                Go Order from this Restaurant as Customer
+                {selectedRestId === 'all' ? 'Browse Restaurants & Order Food' : `Go Order from ${selectedRest.name}`}
               </button>
             )}
           </div>

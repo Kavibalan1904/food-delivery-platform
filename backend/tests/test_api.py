@@ -158,3 +158,26 @@ def test_restaurant_search_and_sort(client):
     ratings = [r["rating"] for r in sort_res.json()]
     assert ratings == sorted(ratings, reverse=True)
 
+
+def test_prometheus_metrics(client):
+    """Verify Prometheus metrics endpoint and metric collection."""
+    # 1. Scrape standard /metrics endpoint
+    res = client.get("/metrics")
+    assert res.status_code == 200
+    assert "text/plain" in res.headers.get("content-type", "")
+    content = res.text
+
+    # Verify standard metrics and custom domain metrics exist in scrape output
+    assert "http_requests_total" in content
+    assert "http_request_duration_seconds" in content
+    assert "bite_orders_total" in content
+    assert "bite_order_revenue_total" in content
+    assert "bite_active_orders" in content
+    assert "bite_user_actions_total" in content
+
+    # 2. Scrape alias /api/metrics endpoint
+    alias_res = client.get("/api/metrics")
+    assert alias_res.status_code == 200
+    assert "http_requests_total" in alias_res.text
+
+

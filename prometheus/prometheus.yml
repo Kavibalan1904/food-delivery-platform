@@ -1,0 +1,29 @@
+# ==============================================================================
+# Prometheus Configuration for Bite Food Delivery Platform
+# ==============================================================================
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+  scrape_timeout: 5s
+
+scrape_configs:
+  # Self-monitoring of the Prometheus server instance
+  - job_name: "prometheus"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          environment: "production"
+          service: "prometheus-core"
+
+  # SwiftBite FastAPI Backend Microservice
+  - job_name: "bite-backend"
+    metrics_path: "/metrics"
+    scrape_interval: 5s
+    scrape_timeout: 4s
+    static_configs:
+      - targets: ["backend:8000"]
+        labels:
+          environment: "production"
+          service: "swiftbite-api"
+          app: "backend"
