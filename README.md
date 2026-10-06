@@ -7,9 +7,9 @@
 
 ---
 
-## 💡 In Simple Terms: How Does Bite Work?
+## 💡 Architecture Overview: How Does Bite Work?
 
-Think of Bite like a modern digital food court divided into five simple parts:
+Think of Bite like a modern digital food court divided into five core components:
 
 1. **Storefront (Frontend):** An interactive web menu built with **React** where customers browse dishes, add meals to their cart, and track orders.
 2. **Kitchen Manager (Backend):** A high-speed **FastAPI (Python)** server that receives customer orders, verifies user logins, and notifies restaurant kitchens.
@@ -37,7 +37,7 @@ Think of Bite like a modern digital food court divided into five simple parts:
 
 ## 🚀 Complete Step-by-Step Fresher Deployment Guide
 
-Follow these 7 simple steps to launch, configure, and run Bite from scratch on an **AWS EC2** instance.
+Follow these 7 steps to launch, configure, and run Bite from scratch on an **AWS EC2** instance.
 
 ```
   [ Developer: git push ]
@@ -84,13 +84,7 @@ Follow these 7 simple steps to launch, configure, and run Bite from scratch on a
      - `Port 8000` (Backend API & Swagger) — FastAPI endpoints & docs (`0.0.0.0/0`).
      - `Port 8080` (Jenkins) — CI/CD automation dashboard (`0.0.0.0/0`).
      - `Port 9090` (Prometheus) — Metrics scraper & PromQL console (`0.0.0.0/0`).
-3. Click **Launch Instance**.custom rules:
-     - `Port 22` (SSH) — Remote terminal administration (`0.0.0.0/0` or your IP).
-     - `Port 3000` (Frontend) — React customer web application (`0.0.0.0/0`).
-     - `Port 8000` (Backend API & Swagger) — FastAPI endpoints & docs (`0.0.0.0/0`).
-     - `Port 8080` (Jenkins) — CI/CD automation dashboard (`0.0.0.0/0`).
 3. Click **Launch Instance**.
-
 ---
 
 ### Step 2: Connect to Your Cloud Server via SSH
@@ -99,7 +93,7 @@ Follow these 7 simple steps to launch, configure, and run Bite from scratch on a
    ```bash
    chmod 400 food.pem
    ```
-   *(In Simple Terms: SSH requires that only you can read this private key. If permissions are too open, SSH blocks the connection).*
+   *(Security note: SSH requires that only you can read this private key. If permissions are too open, SSH blocks the connection).*
 3. Connect using the public IP of your EC2 server:
    ```bash
    ssh -i food.pem ubuntu@<YOUR-EC2-PUBLIC-IP>
@@ -241,6 +235,11 @@ Open your browser and verify:
 | ![Partner Kitchen Portal](docs_screenshots/11_restaurant_partner_kitchen_portal.png) | ![Real-Time Preparing](docs_screenshots/12_realtime_order_preparing_update.png) |
 | *Merchant dashboard receiving live order #1E2C99* | *Zero-latency status update (<1ms) + rider assigned* |
 
+| 5. Prometheus Target Scraping Pool | 6. Grafana Live Observability Dashboard |
+| :---: | :---: |
+| ![Prometheus Targets](docs_screenshots/13_prometheus_targets_active_scrape.png) | ![Grafana Dashboard](docs_screenshots/14_grafana_fullstack_observability_dashboard.png) |
+| *Active scrape pool showing 100% UP health for FastAPI backend & Prometheus* | *Live KPI flight deck: P95 latency (4.80ms), 111 requests, 0% errors & GMV revenue* |
+
 ---
 
 ## ⚡ How Real-Time Synchronization Works
@@ -326,6 +325,30 @@ No manual dashboard creation or datasource clicking required! On container launc
 1. `grafana/provisioning/datasources/datasources.yml` connects Grafana to Prometheus automatically.
 2. `grafana/provisioning/dashboards/dashboards.yml` provisions the pre-built `Bite Platform — Full-Stack Observability` dashboard.
 3. Access immediately at `http://<EC2-IP>:3001` (Username: `admin`, Password: `admin`).
+
+### ⚡ Quick Steps for Monitoring & Observability Tools
+
+Follow these 4 quick steps to access and operate the live monitoring stack on your server:
+
+1. **Expose Monitoring Ports (Background Port-Forwarding):**
+   Run this single command block in your EC2 terminal:
+   ```bash
+   # Kill stale listeners and forward Prometheus & Grafana simultaneously
+   pkill -f "kubectl port-forward"
+   kubectl port-forward --address 0.0.0.0 service/prometheus 9090:9090 &
+   kubectl port-forward --address 0.0.0.0 service/grafana 3001:3000 &
+   ```
+2. **Verify Target Health in Prometheus:**
+   - Open `http://<YOUR-EC2-PUBLIC-IP>:9090/targets` in your browser.
+   - Verify that both `bite-backend (1/1 up)` and `prometheus (1/1 up)` display state **UP** with blue health badges.
+3. **Launch the Grafana Dashboard:**
+   - Open `http://<YOUR-EC2-PUBLIC-IP>:3001` in your browser.
+   - Log in using default credentials: **`admin`** / **`admin`** (click *Skip* on password reset).
+   - In the left sidebar, navigate to **Dashboards** ➔ **Bite Platform — Full-Stack Observability**.
+4. **Trigger Live Traffic & Observe Metrics:**
+   - In another browser tab, open the customer storefront at `http://<YOUR-EC2-PUBLIC-IP>:3000`.
+   - Browse dishes and place an order.
+   - Return to Grafana to watch **Backend Health (HEALTHY)**, **P95 Latency (4.80ms)**, **Total HTTP Requests**, and **Gross Order Revenue** update instantly!
 
 ---
 
